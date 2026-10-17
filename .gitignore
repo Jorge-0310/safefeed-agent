@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Se regeneran con los comandos del README
+models/*.joblib
+logs/*.jsonl
+reports/*.json
+
+# Dataset Jigsaw (Kaggle): descárgalo tú; no se versiona
+data/train.csv
+data/*.csv
