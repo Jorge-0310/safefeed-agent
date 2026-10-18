@@ -9,6 +9,4 @@ models/*.joblib
 logs/*.jsonl
 reports/*.json
 
-# Dataset Jigsaw (Kaggle): descárgalo tú; no se versiona
-data/train.csv
-data/*.csv
+
