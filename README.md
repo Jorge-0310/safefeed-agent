@@ -1,16 +1,17 @@
 # SafeFeed-Agent — Agente de moderación de contenido
 
-Fase 2 (desarrollo) del curso de Inteligencia Artificial, Universidad Tecnológica de Bolívar.
+Fase 2 — Desarrollo del agente inteligente segundo parcial del curso de Inteligencia Artificial, Universidad Tecnológica de Bolívar.
+
+**Integrantes:** [Jorge Eliecer Martelo (T00078391) y Anderson Ibañez (T00078386)]
+
 Implementa el diseño de **SAFEFEED-AGENT**: un agente **de aprendizaje con componente basado en
 utilidad** que, antes de publicar un comentario, estima su toxicidad y decide entre
 **bloquear**, **ocultar para revisión humana** o **publicar**, y mejora con las decisiones
 confirmadas o revertidas por moderadores.
 
-> **Importante (honestidad de los resultados).** El entorno es **simulado** y, por defecto, el
-> clasificador se entrena con un **corpus sintético de semilla** (plantillas en inglés). Eso valida
-> que el *agente completo funciona* (ciclo, utilidad, memoria, aprendizaje, log, pruebas), **no**
-> que alcance 90 % sobre comentarios reales. Para cifras reales hay que entrenar con Jigsaw
-> (ver [`data/README.md`](data/README.md)).
+El clasificador se entrena con el dataset **Jigsaw Toxic Comment Classification Challenge** (Kaggle/Google,
+comentarios de Wikipedia en inglés). La plataforma de comentarios, la API de publicación y los
+moderadores son simulados (ver la sección "Entorno simulado").
 
 ## Inicio rápido
 
@@ -18,23 +19,50 @@ confirmadas o revertidas por moderadores.
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
+# 1) Descargar train.csv de Jigsaw y copiarlo en data/train.csv (ver "Datos")
 python -m safefeed.train                  # entrena el clasificador y mide en un conjunto de prueba
 python -m safefeed.runner --steps 3000 --seed 7   # corre el agente contra la plataforma simulada
 python -m pytest -q                       # 26 pruebas automáticas
 ```
 
-Requiere Python 3.10+ (probado con 3.13). Cada comando termina en menos de un minuto con el corpus
-sintético. Si no entrenas antes, `runner` entrena el modelo automáticamente la primera vez.
+Requiere Python 3.10+ (en nuestro caso, probado con 3.13).
 
 Salidas: `models/toxicity_model.joblib`, `reports/offline_metrics.json`,
 `reports/last_run_summary.json` y **`logs/run_<fecha>.jsonl`** (el log de ejecución).
 
-Ablaciones útiles para la Fase 3 (misma semilla, un factor distinto):
+Ablaciones útiles para la Fase 3:
 
 ```bash
 python -m safefeed.runner --steps 3000 --seed 7 --no-learning --tag sin_aprendizaje
 python -m safefeed.runner --steps 3000 --seed 7 --no-coordination --tag sin_coordinacion
 ```
+
+Si el reentrenamiento tarda demasiado con el dataset completo, se puede usar
+`python -m safefeed.train --max-rows 40000` y `--retrain-every 200` en el runner.
+
+## Datos
+
+1. Aceptar las reglas de la competencia en
+   <https://www.kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge> y descargar `train.csv`.
+2. Copiarlo en `data/train.csv` (columnas: `id, comment_text, toxic, severe_toxic, obscene, threat, insult, identity_hate`).
+3. Ejecutar `python -m safefeed.train`. En la salida, `"data_source"` debe decir `"jigsaw"`.
+
+`train.csv` no se versiona porque está en .gitignore, por lo que cada persona debe descargarlo. Sin ese archivo el entrenamiento se detiene con un error, porque no hay corpus de respaldo. Las pruebas automáticas (pytest) no necesitan el CSV porque usan un conjunto mínimo de ejemplos propio.
+
+
+### Preparación de los datos
+
+- **Limpieza de texto** (`safefeed/text.py`): minúsculas, normalización Unicode, eliminación de URLs,
+  reducción de letras repetidas (3 o más pasan a 2) y colapso de espacios.
+- **Vectorización** (`safefeed/model.py`): TF-IDF de palabras (1–2-gramas) y de caracteres (2–5-gramas,
+  que dan algo de robustez ante escritura evasiva como "1d10t").
+- **División:** 80 % entrenamiento / 20 % prueba, estratificada por la etiqueta `toxic`, de modo que ambos
+  conjuntos conservan la misma proporción de comentarios tóxicos. El conjunto de prueba no se usa para entrenar.
+- **Desbalance de clases:** los comentarios tóxicos son una minoría
+  ([COMPLETAR: % de tóxicos en train.csv, p. ej. el resultado de `df["toxic"].mean()`]). No se aplica
+  remuestreo ni `class_weight`; el desbalance se maneja en la decisión, porque la función de utilidad penaliza
+  más dejar pasar un comentario dañino que enviar uno benigno a revisión. Por esta razón la exactitud se
+  compara siempre con la línea base "publicar siempre" y se reportan también precisión, recall, F1 y AUC-PR.
 
 ## Dónde está el ciclo percepción → decisión → acción
 
@@ -91,6 +119,10 @@ respeta las propiedades declaradas:
 
 La misma semilla produce exactamente el mismo flujo y las mismas decisiones.
 
+**Nota:** los comentarios que genera el simulador son frases de plantilla, no comentarios reales de Jigsaw.
+El modelo se entrena y evalúa con Jigsaw, pero el flujo simulado es otro tipo de texto; por eso los
+resultados de la simulación y los de la evaluación offline no son comparables entre sí.
+
 ## Log de ejecución
 
 Cada ejecución escribe un archivo JSON Lines (`logs/run_<fecha>.jsonl`), una línea por evento, con
@@ -113,26 +145,45 @@ Un ejemplo corto está en [`examples/sample_run.jsonl`](examples/sample_run.json
 | Qué cambió | Por qué |
 |---|---|
 | Plataforma, API de publicación y moderadores son **simulados** | No hay acceso a una plataforma real; el enunciado permite un simulador que respete las propiedades del ambiente |
-| El corpus de entrenamiento por defecto es **sintético** (Jigsaw es opcional) | Kaggle exige cuenta y aceptar reglas; el repo debe correr en otro equipo sin pasos manuales. Con Jigsaw (`data/train.csv`) se usa automáticamente |
+| Los comentarios del simulador son **sintéticos** (de plantilla), aunque el modelo se entrena con Jigsaw | Hace falta un flujo con olas de ataque coordinado y deriva de vocabulario, que Jigsaw no contiene |
 | "Riesgo bajo / intermedio / grave" **no son umbrales fijos**: son las regiones donde gana cada acción en la utilidad esperada | Es la forma coherente de un agente basado en utilidad; las regiones dependen de `UtilityConfig`, de la severidad y de la ola |
 | Subcategorías = las 5 de Jigsaw (`severe_toxic`, `obscene`, `threat`, `insult`, `identity_hate`) | Son las etiquetas del dataset de referencia |
 | La meta "reducir 50 % el tiempo de respuesta" se mide como **latencia por comentario (ms)** y como **proxy de carga humana** (`human_review_workload_reduction`: fracción que no va a revisión manual) | La Fase 1 detectó que la meta original no tenía línea base medible |
 | Los moderadores simulados revisan la cola de "ocultos" y atienden apelaciones al 8 % de los bloqueos | Es la fuente de retroalimentación del diseño (confirmación/reversión) |
 | Se añadieron las banderas `--no-learning` y `--no-coordination` | Permiten las ablaciones de la Fase 3 |
 
-## Resultados de ejemplo (corpus sintético, semilla 7)
+## Resultados (entrenamiento con Jigsaw)
 
-Offline (`python -m safefeed.train`, 6 400 train / 1 600 test): exactitud 0.978 frente a 0.886 de
-"publicar siempre", F1 0.895, AUC-ROC 0.919, AUC-PR 0.862.
+**Evaluación offline** (`python -m safefeed.train`, conjunto de prueba del 20 %, umbral 0.5):
 
-Simulación (`--steps 3000 --seed 7`): exactitud 0.987 (línea base "publicar siempre": 0.793),
-precisión 0.942, recall 1.0, 0 % de bloqueos injustos, 100 % de los 339 comentarios de ataque
-contenidos, latencia media ≈ 2.7 ms (p95 ≈ 3.8 ms), 127 veredictos de moderadores y 2 reentrenamientos.
+| Métrica | Valor |
+|---|---|
+| Comentarios de entrenamiento / prueba | [COMPLETAR] / [COMPLETAR] |
+| Exactitud | [COMPLETAR] |
+| Línea base "siempre no tóxico" | [COMPLETAR] |
+| Precisión / Recall / F1 | [COMPLETAR] / [COMPLETAR] / [COMPLETAR] |
+| AUC-ROC / AUC-PR | [COMPLETAR] / [COMPLETAR] |
 
-**Cómo leerlos:** la exactitud sola es engañosa con clases desbalanceadas (siempre se compara con la línea
-base). Y como los datos sintéticos salen de pocas plantillas, el problema es fácil: el AUC en simulación
-da ≈ 1.0 y la diferencia entre con y sin aprendizaje es mínima (recall 1.0 frente a 0.998 en esta semilla).
-Esto confirma que el pipeline funciona, no que el agente rinda así con comentarios reales.
+Estos valores salen de `reports/offline_metrics.json`.
+
+**Simulación** (`python -m safefeed.runner --steps 3000 --seed 7`):
+
+| Métrica | Valor |
+|---|---|
+| Exactitud (línea base "publicar siempre") | [COMPLETAR] ([COMPLETAR]) |
+| Precisión / Recall | [COMPLETAR] / [COMPLETAR] |
+| Bloqueos injustos (`false_block_rate`) | [COMPLETAR] |
+| Comentarios dañinos publicados (`harmful_published_rate`) | [COMPLETAR] |
+| Ataques contenidos | [COMPLETAR] |
+| Latencia media / p95 (ms) | [COMPLETAR] / [COMPLETAR] |
+| Veredictos de moderadores / reentrenamientos | [COMPLETAR] / [COMPLETAR] |
+
+Estos valores salen de `reports/last_run_summary.json`.
+
+**Cómo leerlos:** la exactitud sola es engañosa con clases desbalanceadas, por eso se compara siempre con la
+línea base y se mira también el F1 y el AUC-PR. Los resultados de la simulación miden si el agente completo
+(percepción, utilidad, coordinación, aprendizaje) funciona sobre un flujo simulado, no la calidad del clasificador
+sobre comentarios reales; para eso sirve la evaluación offline.
 
 ## Limitaciones conocidas
 
@@ -141,7 +192,8 @@ Esto confirma que el pipeline funciona, no que el agente rinda así con comentar
   Mejora futura: canal de denuncias de usuarios sobre comentarios publicados.
 - Inglés únicamente (el dataset de referencia es de Wikipedia en inglés); no hay soporte multilingüe.
 - Reentrenar re-ajusta todo el modelo: con Jigsaw completo (~160 000 filas) tarda varios segundos o minutos
-  por reentrenamiento; usa `--max-rows` al entrenar o sube `--retrain-every`.
+  por reentrenamiento; usar `--max-rows` al entrenar o subir `--retrain-every`.
+- El simulador no reproduce comentarios reales de Jigsaw, por lo que el modelo puede rendir distinto sobre el flujo simulado que en la evaluación offline.
 - Sesgos del dataset original (comentarios de Wikipedia) no se mitigan aquí; es un riesgo ético declarado en el diseño.
 
 ## Estructura

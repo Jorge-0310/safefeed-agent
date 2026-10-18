@@ -158,9 +158,11 @@ def load_training_data(
     jigsaw_path: Path,
     max_rows: Optional[int] = None,
     seed: int = 42,
-    n_synth: int = 8000,
 ) -> Tuple[pd.DataFrame, str]:
-    """Devuelve (DataFrame, fuente). Usa Jigsaw si está disponible; si no, el corpus sintético."""
-    if Path(jigsaw_path).exists():
-        return load_jigsaw(jigsaw_path, max_rows, seed), "jigsaw"
-    return synthetic_seed(n_synth, seed), "synthetic_seed"
+    """Devuelve (DataFrame, fuente)."""
+    path = Path(jigsaw_path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"No se encontró el dataset {path}."
+        )
+    return load_jigsaw(path, max_rows, seed), "jigsaw"

@@ -13,15 +13,41 @@ import argparse
 import json
 from pathlib import Path
 from typing import Optional
+import pandas as pd
 
 import numpy as np
 from sklearn.metrics import (accuracy_score, average_precision_score, f1_score,
                              precision_score, recall_score, roc_auc_score)
 from sklearn.model_selection import train_test_split
 
-from .config import JIGSAW_TRAIN, LABELS, MODEL_PATH, REPORT_DIR
+from .config import DATA_DIR, JIGSAW_TRAIN, LABELS, MODEL_PATH, REPORT_DIR
 from .data import load_training_data
 from .model import ToxicityModel
+
+JIGSAW_TEST = DATA_DIR / "test.csv"
+JIGSAW_TEST_LABELS = DATA_DIR / "test_labels.csv"
+
+
+def evaluate_on_kaggle_test(model, test_path=JIGSAW_TEST, labels_path=JIGSAW_TEST_LABELS):
+    """Evalúa en el test oficial de Jigsaw. Descarta las filas sin etiqueta (-1)."""
+    if not (Path(test_path).exists() and Path(labels_path).exists()):
+        return None
+    df = pd.read_csv(test_path).merge(pd.read_csv(labels_path), on="id")
+    df = df[df["toxic"] != -1]
+    probs = model.predict_proba(df["comment_text"].tolist())
+    y = df["toxic"].values.astype(int)
+    pred = (probs[:, 0] >= 0.5).astype(int)
+    return {
+        "n_test_kaggle": int(len(df)),
+        "toxic_rate": round(float(y.mean()), 4),
+        "baseline_accuracy_always_non_toxic": round(float(1 - y.mean()), 4),
+        "accuracy": round(float(accuracy_score(y, pred)), 4),
+        "precision": round(float(precision_score(y, pred, zero_division=0)), 4),
+        "recall": round(float(recall_score(y, pred, zero_division=0)), 4),
+        "f1": round(float(f1_score(y, pred, zero_division=0)), 4),
+        "auc_roc": round(float(roc_auc_score(y, probs[:, 0])), 4),
+        "auc_pr": round(float(average_precision_score(y, probs[:, 0])), 4),
+    }
 
 
 def train_and_save(
@@ -29,10 +55,9 @@ def train_and_save(
     model_path: Path = MODEL_PATH,
     max_rows: Optional[int] = None,
     seed: int = 42,
-    n_synth: int = 8000,
     report_path: Optional[Path] = REPORT_DIR / "offline_metrics.json",
 ) -> ToxicityModel:
-    df, source = load_training_data(data_path, max_rows, seed, n_synth)
+    df, source = load_training_data(data_path, max_rows, seed)
     train_df, test_df = train_test_split(df, test_size=0.2, stratify=df["toxic"], random_state=seed)
 
     model = ToxicityModel(seed=seed)
@@ -62,13 +87,11 @@ def train_and_save(
         "meets_accuracy_goal_90": bool(accuracy_score(y, pred) >= 0.90),
         "fit_seconds": round(model.last_fit_seconds, 2),
         "note": (
-            "ATENCIÓN: datos sintéticos de semilla; estas cifras NO representan el desempeño "
-            "sobre comentarios reales. Coloca data/train.csv (Jigsaw) y vuelve a entrenar."
-            if source != "jigsaw" else
             "Entrenado y evaluado sobre Jigsaw. La exactitud sola es engañosa por el desbalance: "
             "compárala con baseline_accuracy_always_non_toxic y mira F1/AUC-PR."
         ),
     }
+    metrics["kaggle_test"] = evaluate_on_kaggle_test(model)
     model.save(model_path)
     if report_path:
         Path(report_path).parent.mkdir(parents=True, exist_ok=True)
