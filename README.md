@@ -1,23 +1,76 @@
 # SafeFeed-Agent — Agente de moderación de contenido
 
-Fase 2 — Desarrollo del agente inteligente segundo parcial del curso de Inteligencia Artificial, Universidad Tecnológica de Bolívar.
+Fase 2 — Desarrollo del agente inteligente  
+Segundo parcial del curso de Inteligencia Artificial  
+Universidad Tecnológica de Bolívar
 
-**Integrantes:** [Jorge Eliecer Martelo (T00078391) y Anderson Ibañez (T00078386)]
+**Integrantes:** Jorge Eliecer Martelo (T00078391) y Anderson Ibañez (T00078386)
 
-Implementa el diseño de **SAFEFEED-AGENT**: un agente **de aprendizaje con componente basado en
-utilidad** que, antes de publicar un comentario, estima su toxicidad y decide entre
-**bloquear**, **ocultar para revisión humana** o **publicar**, y mejora con las decisiones
-confirmadas o revertidas por moderadores.
+SafeFeed-Agent es un agente de **aprendizaje con componente basado en utilidad** que, antes de publicar un comentario, estima su toxicidad y decide entre:
 
-El clasificador se entrena con el dataset **Jigsaw Toxic Comment Classification Challenge** (Kaggle/Google,
-comentarios de Wikipedia en inglés). La plataforma de comentarios, la API de publicación y los
-moderadores son simulados (ver la sección "Entorno simulado").
+- Bloquearlo.
+- Ocultarlo para revisión humana.
+- Publicarlo.
+
+El agente también puede mejorar mediante las decisiones confirmadas o revertidas por los moderadores simulados.
+
+El clasificador se entrena exclusivamente con el dataset **Jigsaw Toxic Comment Classification Challenge**, compuesto por comentarios de Wikipedia en inglés. La plataforma de comentarios, la API de publicación y los moderadores son simulados porque no se dispone de una plataforma real para realizar las pruebas.
 
 ## Inicio rápido
 
+### 1. Crear el entorno virtual
+
+En Linux o macOS:
+
 ```bash
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate
+```
+
+En Windows:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+### 2. Instalar las dependencias
+
+```bash
 pip install -r requirements.txt
+```
+
+### 3. Preparar el dataset Jigsaw
+
+Descarga y coloca los archivos del dataset en la carpeta `data/`:
+
+```text
+data/
+├── train.csv
+├── test.csv
+└── test_labels.csv
+```
+
+Las instrucciones detalladas se encuentran en [`data/README.md`](data/README.md).
+
+El archivo `train.csv` es obligatorio para entrenar el modelo de producción. El proyecto no utiliza automáticamente el corpus sintético como respaldo.
+
+### 4. Entrenar y evaluar el clasificador
+
+```bash
+python -m safefeed.train
+```
+
+Este comando:
+
+1. Lee `data/train.csv`.
+2. Divide los datos en 70 % para entrenamiento y 30 % para prueba.
+3. Entrena el clasificador con la partición de entrenamiento.
+4. Evalúa el modelo sobre la partición de prueba.
+5. Evalúa adicionalmente sobre `test.csv` y `test_labels.csv` si ambos archivos están disponibles.
+6. Guarda el modelo y las métricas.
+
+### 5. Ejecutar el agente
 
 # 1) Descargar train.csv de Jigsaw y copiarlo en data/train.csv (ver "Datos")
 python -m safefeed.train                  # entrena el clasificador y mide en un conjunto de prueba
@@ -25,16 +78,48 @@ python -m safefeed.runner --steps 3000 --seed 7   # corre el agente contra la pl
 python -m pytest -q                       # pruebas automáticas
 ```
 
-Requiere Python 3.10+ (en nuestro caso, probado con 3.13).
-
-Salidas: `models/toxicity_model.joblib`, `reports/offline_metrics.json`,
-`reports/last_run_summary.json` y **`logs/run_<fecha>.jsonl`** (el log de ejecución).
-
-Ablaciones útiles para la Fase 3:
+### 6. Ejecutar las pruebas automáticas
 
 ```bash
-python -m safefeed.runner --steps 3000 --seed 7 --no-learning --tag sin_aprendizaje
-python -m safefeed.runner --steps 3000 --seed 7 --no-coordination --tag sin_coordinacion
+python -m pytest -q
+```
+
+Las pruebas automáticas utilizan un corpus sintético pequeño y controlado para comprobar el comportamiento del agente. Este corpus no se utiliza para reportar el desempeño real del clasificador.
+
+## Salidas generadas
+
+Los comandos generan los siguientes archivos:
+
+```text
+models/toxicity_model.joblib
+reports/offline_metrics.json
+reports/last_run_summary.json
+logs/run_<fecha>.jsonl
+```
+
+- `toxicity_model.joblib`: modelo entrenado.
+- `offline_metrics.json`: métricas del clasificador sobre Jigsaw.
+- `last_run_summary.json`: métricas de la última simulación.
+- `run_<fecha>.jsonl`: registro detallado de la ejecución.
+
+## Ablaciones para la Fase 3
+
+Para estudiar el aporte de cada componente, pueden ejecutarse las siguientes variantes:
+
+```bash
+python -m safefeed.runner \
+  --steps 3000 \
+  --seed 7 \
+  --no-learning \
+  --tag sin_aprendizaje
+```
+
+```bash
+python -m safefeed.runner \
+  --steps 3000 \
+  --seed 7 \
+  --no-coordination \
+  --tag sin_coordinacion
 ```
 
 Para iteraciones rápidas se puede usar `python -m safefeed.train --max-rows 40000`; el runner
@@ -52,8 +137,9 @@ reentrena por defecto cada 200 etiquetas nuevas y permite ajustarlo con `--retra
 
 `train.csv` no se versiona porque está en .gitignore, por lo que cada persona debe descargarlo. El entrenamiento normal no sustituye silenciosamente un corpus Jigsaw ausente por datos sintéticos. Las pruebas automáticas usan su corpus sintético de prueba.
 
+### División del dataset
 
-### Preparación de los datos
+El archivo `train.csv` se divide de la siguiente forma:
 
 - **Limpieza de texto** (`safefeed/text.py`): minúsculas, normalización Unicode, eliminación de URLs,
   reducción de letras repetidas (3 o más pasan a 2) y colapso de espacios.
@@ -74,9 +160,9 @@ reentrena por defecto cada 200 etiquetas nuevas y permite ajustarlo con `--retra
 
 ## Dónde está el ciclo percepción → decisión → acción
 
-Todo vive en [`safefeed/agent.py`](safefeed/agent.py), clase `SafeFeedAgent`:
+El ciclo principal está implementado en la clase `SafeFeedAgent`, ubicada en [`safefeed/agent.py`](safefeed/agent.py).
 
-| Fase | Método | Qué hace |
+| Fase | Método | Función |
 |---|---|---|
 | Percepción | `perceive()` | Limpia el texto, tokeniza y calcula señales de coordinación con la memoria de corto plazo |
 | Decisión | `decide()` | Probabilidad de toxicidad + subcategoría → probabilidad efectiva → utilidad esperada de cada acción → elige la mayor |
@@ -84,8 +170,13 @@ Todo vive en [`safefeed/agent.py`](safefeed/agent.py), clase `SafeFeedAgent`:
 | Aprendizaje | `receive_feedback()`, `retrain()` | Incluye auditorías posteriores de comentarios publicados y reentrena periódicamente con ejemplos recientes |
 | Ciclo | `step()` | Encadena percepción → decisión → acción y escribe cada fase en el log |
 
-El agente **nunca ve la etiqueta verdadera** (hay una prueba que lo verifica): solo texto y metadatos,
-y después la retroalimentación de moderadores.
+- El texto.
+- El identificador del usuario.
+- La marca de tiempo.
+- El hilo de conversación.
+- Las señales calculadas a partir de comentarios recientes.
+
+La retroalimentación llega posteriormente desde los moderadores simulados.
 
 ## Coherencia con el tipo de agente
 
@@ -120,56 +211,52 @@ confianza. El resto de los casos sigue usando la función de utilidad esperada.
   utilidades, acción ejecutada, API, latencia, versión y error. `ground_truth` queda separado y
   marcado como procedente del simulador o de feedback del moderador.
 
-## Los 7 componentes IBM del diseño y su código
+## Los siete componentes de la arquitectura
 
 | Componente | Implementación |
 |---|---|
-| Percepción y manejo de entradas | `SafeFeedAgent.perceive`, `text.py` (limpieza/tokenización), TF-IDF palabra + carácter en `model.py` |
-| Planificación y descomposición | `SafeFeedAgent.step`: probabilidad → comparación con ataques recientes → riesgo → acción (planificación reactiva, corto horizonte) |
-| Memoria | Corto plazo: `coordination.ShortTermMemory` (ventana de 120 s simulados). Largo plazo: datos etiquetados dentro de `ToxicityModel` + búfer de retroalimentación |
-| Razonamiento y decisión | `SafeFeedAgent.decide` + `utility.py` (utilidad esperada, modo "ola" ante ataques coordinados) |
-| Llamada de herramientas | `SafeFeedAgent.act` → `PublicationAPI.execute` (API simulada, con fallos aleatorios y reintento) |
-| Comunicación | Llamadas a la API; casos intermedios a la cola de revisión humana con probabilidad y subcategoría (eventos `decision`/`action` del log); `receive_feedback` cierra el ciclo |
-| Aprendizaje y adaptación | `receive_feedback`, `retrain`, `ToxicityModel.update` |
+| Percepción y manejo de entradas | `SafeFeedAgent.perceive()`, `text.py` y TF-IDF en `model.py`. |
+| Planificación y descomposición | `SafeFeedAgent.step()`: probabilidad de toxicidad → coordinación → riesgo → acción. |
+| Memoria | `ShortTermMemory` conserva comentarios recientes. El modelo conserva los datos etiquetados y el búfer de retroalimentación. |
+| Razonamiento y decisión | `SafeFeedAgent.decide()` y `utility.py` calculan la utilidad esperada de cada acción. |
+| Llamada de herramientas | `SafeFeedAgent.act()` llama a `PublicationAPI.execute()`. |
+| Comunicación | El agente se comunica con la API simulada y envía los casos ocultos a la cola de revisión humana. |
+| Aprendizaje y adaptación | `receive_feedback()`, `retrain()` y `ToxicityModel.update()`. |
 
-## Entorno simulado (propiedades de la sección 3 del diseño)
+## Entorno simulado
 
-[`safefeed/simulator.py`](safefeed/simulator.py) genera exactamente las percepciones de la sección 5 y
-respeta las propiedades declaradas:
+El entorno se implementa en [`safefeed/simulator.py`](safefeed/simulator.py).
 
-| Propiedad | Cómo se respeta |
+El simulador genera las percepciones descritas en el diseño y permite probar el agente sin utilizar una plataforma real.
+
+| Propiedad | Implementación |
 |---|---|
-| Parcialmente observable | El agente recibe texto + usuario + hora + hilo. La verdad (`GroundTruth`) solo la usan el moderador simulado y las métricas |
-| Estocástico | Llegadas exponenciales, mezcla aleatoria, fallos aleatorios de la API (1 %), moderadores que se equivocan (7 %) y tardan un tiempo aleatorio |
-| Secuencial | Las olas de ataque repiten texto; detectarlas exige comparar con comentarios recientes |
-| Dinámico | El flujo no espera al agente; hay 2 olas coordinadas y una deriva de vocabulario y frases a mitad de la simulación |
-| Discreto | Tres acciones y subcategorías; la probabilidad continua se traduce a una de ellas |
-| Multiagente | Usuarios, cuentas coordinadas (bots), moderadores y API de publicación son actores separados |
+| Parcialmente observable | El agente recibe texto y metadatos, pero no recibe la etiqueta verdadera. |
+| Estocástico | Se generan llegadas aleatorias, fallos de API, errores de moderadores y tiempos de respuesta variables. |
+| Secuencial | Las decisiones dependen de los comentarios recientes almacenados en memoria. |
+| Dinámico | Aparecen oleadas coordinadas y deriva de vocabulario durante la ejecución. |
+| Discreto | El agente selecciona entre bloquear, ocultar o publicar. |
+| Multiagente | Participan usuarios, cuentas coordinadas, moderadores y el sistema de publicación. |
 
-La misma semilla produce exactamente el mismo flujo y las mismas decisiones.
+La misma semilla produce el mismo flujo de comentarios y las mismas decisiones del agente. Las marcas de tiempo reales de los logs pueden variar entre ejecuciones.
 
-**Nota:** los comentarios que genera el simulador son frases de plantilla, no comentarios reales de Jigsaw.
-El modelo se entrena y evalúa con Jigsaw, pero el flujo simulado es otro tipo de texto; por eso los
-resultados de la simulación y los de la evaluación offline no son comparables entre sí.
+El simulador contiene frases sintéticas diseñadas para representar:
 
-## Log de ejecución
+- Comentarios benignos.
+- Insultos.
+- Amenazas.
+- Discurso de odio.
+- Escritura evasiva.
+- Ataques coordinados.
+- Deriva de vocabulario.
 
-Cada ejecución escribe un archivo JSON Lines (`logs/run_<fecha>.jsonl`), una línea por evento, con
-`ts` (hora real UTC) y `sim_time` (reloj simulado). Eventos: `run_start`, `percept`, `decision`
-(probabilidades, utilidades esperadas y rationale), `action` (resultado de la API), `ground_truth`
-(**la escribe el simulador; el agente no la ve**), `feedback`, `retrain`, `run_end` (resumen de métricas).
-Un ejemplo corto está en [`examples/sample_run.jsonl`](examples/sample_run.jsonl). Estos logs son la base de la Fase 3.
+Estos comentarios no son los comentarios originales de Jigsaw. Por esta razón, los resultados offline sobre Jigsaw y los resultados de la simulación no deben interpretarse como la misma métrica.
 
-## Qué razona el código y qué hacen las herramientas externas
+## Registro de ejecución
 
-| Parte | Quién la hace |
-|---|---|
-| Ciclo del agente, memoria, señal de coordinación, función de utilidad, elección de acción, reentrenamiento, simulador, métricas | **Código propio** (Python) |
-| Vectorización TF-IDF y regresión logística (entrenamiento e inferencia) | **scikit-learn** (el agente decide *cuándo* reentrenar y con qué ejemplos) |
-| Lectura de datos y persistencia | pandas, joblib |
-| **Modelos de lenguaje (LLM)** | **No se usa ninguno.** Ninguna decisión del agente depende de un LLM |
+Cada ejecución genera un archivo JSON Lines en la carpeta `logs/`.
 
-## Cambios respecto al diseño (documentados y justificados)
+Cada evento contiene:
 
 | Qué cambió | Por qué |
 |---|---|
@@ -264,7 +351,9 @@ La latencia corresponde al entorno de ejecución del prototipo, desde percepció
 la acción; **no** es una comparación contra moderadores humanos. Los resultados del simulador usan
 comentarios sintéticos y no se deben presentar como desempeño real en producción.
 
-## Limitaciones conocidas
+### Evaluación del agente en el entorno simulado
+
+La simulación se ejecuta con:
 
 - Las auditorías simuladas cubren una muestra de publicaciones, no todas; los falsos negativos no
   auditados siguen sin etiqueta. La exactitud posterior al reentrenamiento del buffer es una medida
@@ -275,8 +364,10 @@ comentarios sintéticos y no se deben presentar como desempeño real en producci
 - El simulador no reproduce comentarios reales de Jigsaw, por lo que el modelo puede rendir distinto sobre el flujo simulado que en la evaluación offline.
 - Sesgos del dataset original (comentarios de Wikipedia) no se mitigan aquí; es un riesgo ético declarado en el diseño.
 
-## Estructura
+Los resultados se guardan en:
 
+```text
+reports/last_run_summary.json
 ```
 safefeed/        agent.py (ciclo) · utility.py · coordination.py · model.py · simulator.py
                  data.py · text.py · metrics.py · logger.py · train.py · runner.py · config.py · schemas.py
@@ -287,7 +378,10 @@ data/ models/ logs/ reports/   entradas y salidas (se regeneran)
 
 ## Referencias
 
-- Russell, S. J., & Norvig, P. *Artificial Intelligence: A Modern Approach* (Global Edition).
-- IBM. "Components of AI agents". <https://www.ibm.com/mx-es/think/topics/components-of-ai-agents>
-- Jigsaw / Google. "Jigsaw Toxic Comment Classification Challenge" (Kaggle).
-- Hosseini, H., et al. "Deceiving Google's Perspective API Built for Detecting Toxic Comments" (arXiv:1702.08138) — motiva los n-gramas de caracteres.
+- Russell, S. J., & Norvig, P. *Artificial Intelligence: A Modern Approach*. Global Edition.
+- IBM. “Components of AI agents”.  
+  <https://www.ibm.com/mx-es/think/topics/components-of-ai-agents>
+- Jigsaw / Google. “Jigsaw Toxic Comment Classification Challenge”.  
+  <https://www.kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge>
+- Hosseini, H., Kannan, S., Zhang, B., & Poovendran, R. “Deceiving Google’s Perspective API Built for Detecting Toxic Comments”.  
+  <https://arxiv.org/abs/1702.08138>

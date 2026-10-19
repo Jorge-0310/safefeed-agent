@@ -1,0 +1,119 @@
+from pathlib import Path
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+
+DATA_PATH = Path("data/train.csv")
+
+LABELS = [
+    "toxic",
+    "severe_toxic",
+    "obscene",
+    "threat",
+    "insult",
+    "identity_hate",
+]
+
+REQUIRED_COLUMNS = ["id", "comment_text", *LABELS]
+
+
+def main():
+    df = pd.read_csv(DATA_PATH)
+
+    print("=== VALIDACIÓN DEL DATASET JIGSAW ===")
+    print(f"Archivo: {DATA_PATH}")
+    print(f"Filas: {len(df)}")
+    print(f"Columnas: {len(df.columns)}")
+
+    # Supuesto 1: estructura
+    columns_ok = set(REQUIRED_COLUMNS).issubset(df.columns)
+    print("\n[1] Estructura")
+    print(f"Columnas requeridas presentes: {columns_ok}")
+    print(f"Columnas encontradas: {list(df.columns)}")
+
+    # Supuesto 2: faltantes y vacíos
+    missing = int(df.isna().sum().sum())
+    empty = int(df["comment_text"].astype(str).str.strip().eq("").sum())
+    print("\n[2] Datos faltantes y textos vacíos")
+    print(f"Valores faltantes: {missing}")
+    print(f"Comentarios vacíos: {empty}")
+
+    # Supuesto 3: duplicados
+    duplicate_ids = int(df["id"].duplicated().sum())
+    duplicate_texts = int(df["comment_text"].duplicated().sum())
+    print("\n[3] Duplicados")
+    print(f"IDs duplicados: {duplicate_ids}")
+    print(f"Comentarios duplicados: {duplicate_texts}")
+
+    # Supuesto 4: etiquetas binarias
+    invalid_labels = int(
+        (~df[LABELS].isin([0, 1])).sum().sum()
+    )
+    print("\n[4] Valores de etiquetas")
+    print(f"Etiquetas inválidas: {invalid_labels}")
+
+    # Supuesto 5: división estratificada 70/30
+    full_rate = df["toxic"].mean()
+    train_df, test_df = train_test_split(
+        df,
+        test_size=0.30,
+        stratify=df["toxic"],
+        random_state=42,
+    )
+
+    train_rate = train_df["toxic"].mean()
+    test_rate = test_df["toxic"].mean()
+
+    print("\n[5] División estratificada 70/30")
+    print(f"Tasa total de toxicidad: {full_rate:.6f}")
+    print(f"Tasa en entrenamiento: {train_rate:.6f}")
+    print(f"Tasa en prueba: {test_rate:.6f}")
+    print(
+        "Diferencia entrenamiento: "
+        f"{abs(train_rate - full_rate):.6f}"
+    )
+    print(
+        "Diferencia prueba: "
+        f"{abs(test_rate - full_rate):.6f}"
+    )
+
+    # Supuesto 6: longitud
+    lengths = df["comment_text"].astype(str).str.len()
+    over_limit = int((lengths > 5000).sum())
+
+    print("\n[6] Longitud de comentarios")
+    print(f"Longitud mínima: {lengths.min()}")
+    print(f"Longitud máxima: {lengths.max()}")
+    print(f"Comentarios de más de 5.000 caracteres: {over_limit}")
+
+    # Limitación: consistencia de etiquetas
+    subcategories = LABELS[1:]
+    any_subcategory = df[subcategories].sum(axis=1) > 0
+    inconsistent_sub_to_non_toxic = int(
+        (any_subcategory & (df["toxic"] == 0)).sum()
+    )
+    toxic_without_subcategory = int(
+        ((~any_subcategory) & (df["toxic"] == 1)).sum()
+    )
+
+    print("\n[7] Consistencia entre toxicidad y subcategorías")
+    print(
+        "Subcategoría positiva con toxic=0: "
+        f"{inconsistent_sub_to_non_toxic}"
+    )
+    print(
+        "toxic=1 sin subcategoría positiva: "
+        f"{toxic_without_subcategory}"
+    )
+
+    # Distribución
+    print("\n[8] Distribución de etiquetas")
+    for label in LABELS:
+        count = int(df[label].sum())
+        rate = df[label].mean() * 100
+        print(f"{label}: {count} positivos ({rate:.3f} %)")
+
+
+if __name__ == "__main__":
+    main()

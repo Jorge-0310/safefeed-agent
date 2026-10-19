@@ -147,6 +147,7 @@ class SafeFeedAgent:
             self._pending[decision.comment_id] = (percept.text_raw, actual_action)
         return result
 
+
     # ------------------------------------------------------------------ ciclo completo
     def step(self, raw: RawComment, api) -> Tuple[Percept, Decision, ActionResult]:
         t0 = time.perf_counter()
