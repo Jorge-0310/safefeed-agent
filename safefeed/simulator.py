@@ -135,11 +135,12 @@ class ModeratorSimulator:
     """
 
     def __init__(self, seed: int = 13, accuracy: float = 0.93, mean_delay_s: float = 240.0,
-                 appeal_rate: float = 0.08):
+                 appeal_rate: float = 0.08, post_publication_audit_rate: float = 0.03):
         self.rng = random.Random(seed)
         self.accuracy = accuracy
         self.mean_delay_s = mean_delay_s
         self.appeal_rate = appeal_rate
+        self.post_publication_audit_rate = post_publication_audit_rate
         self._heap: List[Tuple[float, int, ModeratorFeedback]] = []
         self._seq = 0
         self.reviews = 0
@@ -149,15 +150,19 @@ class ModeratorSimulator:
             source = "review_queue"
         elif action == Action.BLOCK and self.rng.random() < self.appeal_rate:
             source = "appeal"
+        elif action == Action.PUBLISH and self.rng.random() < self.post_publication_audit_rate:
+            source = "post_publication_audit"
         else:
             return
         labels = dict(truth.labels)
         if self.rng.random() > self.accuracy:   # error humano
             labels = {k: 0 for k in LABELS} if labels["toxic"] else {**{k: 0 for k in LABELS}, "toxic": 1}
-        claimed_harm = True                      # BLOCK y HIDE son ambos "el agente cree que es dañino"
+        claimed_harm = action != Action.PUBLISH
         verdict = "confirmed" if bool(labels["toxic"]) == claimed_harm else "reverted"
         due = sim_time + self.rng.expovariate(1 / self.mean_delay_s)
-        fb = ModeratorFeedback(comment_id, verdict, labels, round(due, 3), source)
+        fb = ModeratorFeedback(
+            comment_id, verdict, labels, round(due, 3), source, phase=truth.phase
+        )
         self._seq += 1
         heapq.heappush(self._heap, (due, self._seq, fb))
         self.reviews += 1

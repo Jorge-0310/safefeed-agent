@@ -32,11 +32,21 @@ class _Constant:
 
 
 class ToxicityModel:
-    def __init__(self, seed: int = 42, C: float = 4.0, max_features: int = 60000):
+    def __init__(
+        self,
+        seed: int = 42,
+        C: float = 4.0,
+        max_features: int = 60000,
+        class_weight: Optional[str] = None,
+        max_feedback_examples: int = 2000,
+    ):
         self.seed = seed
         self.C = C
         self.max_features = max_features
+        self.class_weight = class_weight
+        self.max_feedback_examples = max_feedback_examples
         self.version = 0
+        self.decision_threshold = 0.5
         self.vectorizer: Optional[FeatureUnion] = None
         self.clfs: dict = {}
         self._texts: List[str] = []
@@ -63,7 +73,12 @@ class ToxicityModel:
             if len(np.unique(y)) < 2:
                 self.clfs[name] = _Constant(float(y[0]))
                 continue
-            clf = LogisticRegression(C=self.C, solver="liblinear", random_state=self.seed)
+            clf = LogisticRegression(
+                C=self.C,
+                solver="liblinear",
+                random_state=self.seed,
+                class_weight=getattr(self, "class_weight", None),
+            )
             clf.fit(X, y, sample_weight=self._w)
             self.clfs[name] = clf
         self.last_fit_seconds = time.perf_counter() - t0
@@ -73,17 +88,32 @@ class ToxicityModel:
         self._Y = np.asarray(Y, dtype=int)
         self._w = (np.ones(len(self._texts)) if sample_weight is None
                    else np.asarray(sample_weight, dtype=float))
+        self._base_size = len(self._texts)
         self._fit_internal()
         self.version = 1
         return self
 
-    def update(self, texts: Sequence[str], Y, weight: float = 1.0) -> "ToxicityModel":
+    def update(self, texts: Sequence[str], Y, weight=1.0) -> "ToxicityModel":
         """Aprendizaje con nueva experiencia: agrega ejemplos (de moderadores) y reentrena."""
         texts = list(texts)
         Y = np.asarray(Y, dtype=int).reshape(len(texts), len(LABELS))
+        base_size = getattr(self, "_base_size", len(self._texts))
+        self._base_size = base_size
+        weights = np.asarray(weight, dtype=float)
+        if weights.ndim == 0:
+            weights = np.full(len(texts), float(weights))
+        if len(weights) != len(texts):
+            raise ValueError("Debe haber un peso por cada ejemplo de retroalimentación.")
         self._texts.extend(texts)
         self._Y = np.vstack([self._Y, Y])
-        self._w = np.concatenate([self._w, np.full(len(texts), float(weight))])
+        self._w = np.concatenate([self._w, weights])
+        feedback_size = max(0, len(self._texts) - base_size)
+        max_feedback = getattr(self, "max_feedback_examples", 2000)
+        excess = feedback_size - max_feedback
+        if excess > 0:
+            self._texts = self._texts[:base_size] + self._texts[base_size + excess:]
+            self._Y = np.vstack([self._Y[:base_size], self._Y[base_size + excess:]])
+            self._w = np.concatenate([self._w[:base_size], self._w[base_size + excess:]])
         self._fit_internal()
         self.version += 1
         return self

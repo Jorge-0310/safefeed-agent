@@ -1,11 +1,11 @@
-"""Entrenamiento + evaluación offline del clasificador de toxicidad.
+"""Entrena y calibra sin fuga de información; evalúa una sola vez en test.
 
-    python -m safefeed.train                      # usa data/train.csv (Jigsaw) o el corpus sintético
-    python -m safefeed.train --max-rows 40000     # submuestrea Jigsaw para ir más rápido
+    python -m safefeed.train
+    python -m safefeed.train --max-rows 40000
 
-Divide en train/test (estratificado), entrena SOLO con train, mide en test y guarda
-el modelo y reports/offline_metrics.json. El agente despliega el modelo entrenado
-con la parte de train; el test queda sin tocar.
+Usa división estratificada 70/15/15 (seed 42 por defecto). La validación decide
+entre LogisticRegression sin peso y class_weight="balanced", y escoge el umbral.
+El test no participa en esas elecciones.
 """
 from __future__ import annotations
 
@@ -13,41 +13,97 @@ import argparse
 import json
 from pathlib import Path
 from typing import Optional
-import pandas as pd
 
 import numpy as np
-from sklearn.metrics import (accuracy_score, average_precision_score, f1_score,
-                             precision_score, recall_score, roc_auc_score)
+import pandas as pd
+from sklearn.metrics import (accuracy_score, average_precision_score, confusion_matrix,
+                             f1_score, precision_score, recall_score, roc_auc_score)
 from sklearn.model_selection import train_test_split
 
-from .config import DATA_DIR, JIGSAW_TRAIN, LABELS, MODEL_PATH, REPORT_DIR
+from .config import (CLASSIFIER_THRESHOLDS, JIGSAW_TRAIN, LABELS, MODEL_PATH,
+                     REPORT_DIR, UtilityConfig)
 from .data import load_training_data
 from .model import ToxicityModel
-
-JIGSAW_TEST = DATA_DIR / "test.csv"
-JIGSAW_TEST_LABELS = DATA_DIR / "test_labels.csv"
+from .utility import utility_action_regions
 
 
-def evaluate_on_kaggle_test(model, test_path=JIGSAW_TEST, labels_path=JIGSAW_TEST_LABELS):
-    """Evalúa en el test oficial de Jigsaw. Descarta las filas sin etiqueta (-1)."""
-    if not (Path(test_path).exists() and Path(labels_path).exists()):
-        return None
-    df = pd.read_csv(test_path).merge(pd.read_csv(labels_path), on="id")
-    df = df[df["toxic"] != -1]
-    probs = model.predict_proba(df["comment_text"].tolist())
-    y = df["toxic"].values.astype(int)
-    pred = (probs[:, 0] >= 0.5).astype(int)
-    return {
-        "n_test_kaggle": int(len(df)),
-        "toxic_rate": round(float(y.mean()), 4),
-        "baseline_accuracy_always_non_toxic": round(float(1 - y.mean()), 4),
+def _binary_report(y: np.ndarray, probabilities: np.ndarray, threshold: float) -> dict:
+    pred = (probabilities >= threshold).astype(int)
+    cm = confusion_matrix(y, pred, labels=[0, 1])
+    result = {
+        "threshold": round(float(threshold), 2),
         "accuracy": round(float(accuracy_score(y, pred)), 4),
         "precision": round(float(precision_score(y, pred, zero_division=0)), 4),
         "recall": round(float(recall_score(y, pred, zero_division=0)), 4),
         "f1": round(float(f1_score(y, pred, zero_division=0)), 4),
-        "auc_roc": round(float(roc_auc_score(y, probs[:, 0])), 4),
-        "auc_pr": round(float(average_precision_score(y, probs[:, 0])), 4),
+        "confusion_matrix": cm.tolist(),
+        "true_negative": int(cm[0, 0]),
+        "false_positive": int(cm[0, 1]),
+        "false_negative": int(cm[1, 0]),
+        "true_positive": int(cm[1, 1]),
+        "false_positive_rate": round(
+            float(cm[0, 1] / cm[0].sum()) if cm[0].sum() else 0.0, 4
+        ),
+        "false_negative_rate": round(
+            float(cm[1, 0] / cm[1].sum()) if cm[1].sum() else 0.0, 4
+        ),
     }
+    if len(np.unique(y)) == 2:
+        result["auc_roc"] = round(float(roc_auc_score(y, probabilities)), 4)
+        result["auc_pr"] = round(float(average_precision_score(y, probabilities)), 4)
+    else:
+        result["auc_roc"] = None
+        result["auc_pr"] = None
+    return result
+
+
+def calibrate_threshold(y_validation: np.ndarray, probabilities: np.ndarray) -> dict:
+    """Prioriza FNR <=10%; dentro de ese objetivo limita FPR a 5% y maximiza recall."""
+    candidates = [
+        _binary_report(y_validation, probabilities, threshold)
+        for threshold in CLASSIFIER_THRESHOLDS
+    ]
+    acceptable_fp = [m for m in candidates if m["false_positive_rate"] <= 0.05]
+    safe = [
+        m for m in acceptable_fp
+        if m["false_negative_rate"] <= 0.10
+    ]
+    if safe:
+        selected = max(safe, key=lambda m: (m["recall"], m["f1"], m["threshold"]))
+    elif acceptable_fp:
+        selected = max(
+            acceptable_fp,
+            key=lambda m: (m["recall"], m["f1"], -m["false_positive_rate"]),
+        )
+    else:
+        selected = min(
+            candidates,
+            key=lambda m: (m["false_negative_rate"], m["false_positive_rate"], -m["f1"]),
+        )
+    return {
+        "selected_threshold": selected["threshold"],
+        "selection_constraints": {
+            "target_harmful_miss_rate_max": 0.10,
+            "target_false_positive_rate_max": 0.05,
+            "meets_harmful_miss_target": selected["false_negative_rate"] <= 0.10,
+            "meets_false_positive_target": selected["false_positive_rate"] <= 0.05,
+            "selection_split": "validation",
+        },
+        "validation_selected_metrics": selected,
+        "threshold_sweep": candidates,
+    }
+
+
+def _validation_rank(calibration: dict) -> tuple:
+    metrics = calibration["validation_selected_metrics"]
+    constraints = calibration["selection_constraints"]
+    return (
+        int(constraints["meets_false_positive_target"]),
+        int(constraints["meets_harmful_miss_target"]),
+        metrics["recall"],
+        metrics["f1"],
+        -metrics["false_positive_rate"],
+    )
 
 
 def train_and_save(
@@ -58,44 +114,89 @@ def train_and_save(
     report_path: Optional[Path] = REPORT_DIR / "offline_metrics.json",
 ) -> ToxicityModel:
     df, source = load_training_data(data_path, max_rows, seed)
-    train_df, test_df = train_test_split(df, test_size=0.2, stratify=df["toxic"], random_state=seed)
+    train_validation, test_df = train_test_split(
+        df, test_size=0.15, stratify=df["toxic"], random_state=seed,
+    )
+    train_df, validation_df = train_test_split(
+        train_validation, test_size=(0.15 / 0.85),
+        stratify=train_validation["toxic"], random_state=seed,
+    )
 
-    model = ToxicityModel(seed=seed)
-    model.fit(train_df["comment_text"].tolist(), train_df[list(LABELS)].values)
+    texts_train = train_df["comment_text"].fillna("").astype(str).tolist()
+    targets_train = train_df[list(LABELS)].fillna(0).values.astype(int)
+    texts_validation = validation_df["comment_text"].fillna("").astype(str).tolist()
+    y_validation = validation_df["toxic"].values.astype(int)
+    candidate_models = {}
+    candidate_reports = {}
 
-    probs = model.predict_proba(test_df["comment_text"].tolist())
-    y = test_df["toxic"].values.astype(int)
-    pred = (probs[:, 0] >= 0.5).astype(int)
+    for name, class_weight in (("original", None), ("balanced", "balanced")):
+        candidate = ToxicityModel(seed=seed, class_weight=class_weight)
+        candidate.fit(texts_train, targets_train)
+        validation_probabilities = candidate.predict_proba(texts_validation)[:, 0]
+        calibration = calibrate_threshold(y_validation, validation_probabilities)
+        candidate_models[name] = candidate
+        candidate_reports[name] = {
+            "class_weight": class_weight,
+            "fit_seconds": round(candidate.last_fit_seconds, 2),
+            "calibration": calibration,
+        }
+
+    selected_name = max(
+        candidate_reports, key=lambda name: _validation_rank(
+            candidate_reports[name]["calibration"]
+        ),
+    )
+    model = candidate_models[selected_name]
+    threshold = candidate_reports[selected_name]["calibration"]["selected_threshold"]
+    model.decision_threshold = threshold
+
+    test_texts = test_df["comment_text"].fillna("").astype(str).tolist()
+    y_test = test_df["toxic"].values.astype(int)
+    test_probabilities = model.predict_proba(test_texts)[:, 0]
+    final_test = _binary_report(y_test, test_probabilities, threshold)
+    final_test["n_test"] = int(len(test_df))
+    final_test["toxic_rate"] = round(float(y_test.mean()), 4)
+    final_test["baseline_accuracy_always_non_toxic"] = round(float(1 - y_test.mean()), 4)
 
     metrics = {
         "data_source": source,
+        "seed": seed,
+        "split": {"train": 0.70, "validation": 0.15, "test": 0.15, "stratified_by": "toxic"},
         "n_train": int(len(train_df)),
+        "n_validation": int(len(validation_df)),
         "n_test": int(len(test_df)),
-        "toxic_rate_test": round(float(y.mean()), 4),
-        "threshold": 0.5,
-        "accuracy": round(float(accuracy_score(y, pred)), 4),
-        "baseline_accuracy_always_non_toxic": round(float(1 - y.mean()), 4),
-        "precision": round(float(precision_score(y, pred, zero_division=0)), 4),
-        "recall": round(float(recall_score(y, pred, zero_division=0)), 4),
-        "f1": round(float(f1_score(y, pred, zero_division=0)), 4),
-        "auc_roc": round(float(roc_auc_score(y, probs[:, 0])), 4),
-        "auc_pr": round(float(average_precision_score(y, probs[:, 0])), 4),
-        "per_label_auc_roc": {
-            name: round(float(roc_auc_score(test_df[name].values, probs[:, j])), 4)
-            for j, name in enumerate(LABELS) if test_df[name].nunique() == 2
+        "toxic_rate": {
+            "train": round(float(train_df["toxic"].mean()), 4),
+            "validation": round(float(validation_df["toxic"].mean()), 4),
+            "test": round(float(y_test.mean()), 4),
         },
-        "meets_accuracy_goal_90": bool(accuracy_score(y, pred) >= 0.90),
-        "fit_seconds": round(model.last_fit_seconds, 2),
+        "model_selection": {
+            "selection_split": "validation",
+            "selected": selected_name,
+            "candidates": candidate_reports,
+        },
+        "final_test": final_test,
+        "f1_target": 0.75,
+        "meets_f1_target": final_test["f1"] >= 0.75,
+        "utility_action_regions": utility_action_regions(UtilityConfig()),
+        "utility_config": UtilityConfig().__dict__,
+        "decision_policy": (
+            "Tres acciones: la utilidad esperada determina las regiones normales; "
+            "barreras configurables de amenaza, toxicidad severa, odio identitario y "
+            "ataque coordinado pueden escalar a block/hide."
+        ),
+        "test_used_for_selection": False,
         "note": (
-            "Entrenado y evaluado sobre Jigsaw. La exactitud sola es engañosa por el desbalance: "
-            "compárala con baseline_accuracy_always_non_toxic y mira F1/AUC-PR."
+            "El conjunto test solo se evaluó después de seleccionar class_weight y umbral "
+            "con validation. No se remuestrearon validation ni test."
         ),
     }
-    metrics["kaggle_test"] = evaluate_on_kaggle_test(model)
     model.save(model_path)
     if report_path:
         Path(report_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(report_path).write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
+        Path(report_path).write_text(
+            json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
     print(json.dumps(metrics, indent=2, ensure_ascii=False))
     return model
 

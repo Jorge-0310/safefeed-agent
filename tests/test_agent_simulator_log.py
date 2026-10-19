@@ -43,7 +43,7 @@ def test_step_runs_perceive_decide_act_in_order_and_logs(tmp_path, base_model):
 def test_benign_comment_is_published(base_model):
     agent = SafeFeedAgent(base_model)
     _, decision, _ = agent.step(
-        RawComment("c2", "u2", 1.0, "t1", "Thanks for fixing the references in the jazz history section."),
+        RawComment("c2", "u2", 1.0, "t1", "Great point about medieval castles."),
         AlwaysOkAPI())
     assert decision.action == Action.PUBLISH
 

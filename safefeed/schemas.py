@@ -52,6 +52,8 @@ class Decision:
     rationale: str
     model_version: int
     latency_ms: float = 0.0
+    safety_rule: Optional[str] = None
+    error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -66,6 +68,8 @@ class ActionResult:
     ok: bool
     status: str
     attempts: int
+    latency_ms: float = 0.0
+    error: Optional[str] = None
 
 
 @dataclass
@@ -77,3 +81,4 @@ class ModeratorFeedback:
     labels: Dict[str, int]        # etiquetas asignadas por el moderador
     sim_time: float
     source: str                   # "review_queue" | "appeal"
+    phase: Optional[str] = None

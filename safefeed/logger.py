@@ -9,6 +9,7 @@ feedback, retrain, run_end. Es la base de las pruebas de la Fase 3.
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -35,8 +36,27 @@ class RunLogger:
             "run_id": self.run_id,
             "event": event,
             "sim_time": None if sim_time is None else round(float(sim_time), 3),
-            **payload,
         }
+        if event in {"percept", "decision", "action", "feedback", "retrain", "ground_truth"}:
+            rec.update({
+                "comment_id": None,
+                "text_hash": None,
+                "coordination": {},
+                "p_toxic": None,
+                "subcategory_probs": {},
+                "p_effective": None,
+                "expected_utilities": {},
+                "action": None,
+                "api_ok": None,
+                "latency_ms": None,
+                "ground_truth": None,
+                "error": None,
+                "model_version": None,
+            })
+        rec.update(payload)
+        text = rec.pop("text", None)
+        if text is not None and "text_hash" not in payload:
+            rec["text_hash"] = hashlib.sha256(str(text).encode("utf-8")).hexdigest()
         self._fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
 
     def close(self) -> None:
