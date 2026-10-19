@@ -126,23 +126,6 @@ def main():
         f"{max(all_differences) <= STRATIFICATION_THRESHOLD}"
     )
 
-
-        train_rate = train_df["toxic"].mean()
-        test_rate = test_df["toxic"].mean()
-
-        print("\n[5] División estratificada 70/30")
-        print(f"Tasa total de toxicidad: {full_rate:.6f}")
-        print(f"Tasa en entrenamiento: {train_rate:.6f}")
-        print(f"Tasa en prueba: {test_rate:.6f}")
-        print(
-            "Diferencia entrenamiento: "
-            f"{abs(train_rate - full_rate):.6f}"
-        )
-        print(
-            "Diferencia prueba: "
-            f"{abs(test_rate - full_rate):.6f}"
-        )
-
     # Supuesto 6: longitud
     lengths = df["comment_text"].astype(str).str.len()
     over_limit = int((lengths > 5000).sum())
