@@ -12,9 +12,9 @@ SafeFeed-Agent es un agente de **aprendizaje con componente basado en utilidad**
 - Ocultarlo para revisión humana.
 - Publicarlo.
 
-El agente también puede mejorar mediante las decisiones confirmadas o revertidas por los moderadores simulados.
+El agente también puede mejorar mediante las decisiones confirmadas o revertidas por los moderadores simulados y mediante auditorías posteriores de publicaciones.
 
-El clasificador se entrena exclusivamente con el dataset **Jigsaw Toxic Comment Classification Challenge**, compuesto por comentarios de Wikipedia en inglés. La plataforma de comentarios, la API de publicación y los moderadores son simulados porque no se dispone de una plataforma real para realizar las pruebas.
+El clasificador de producción se entrena exclusivamente con el dataset **Jigsaw Toxic Comment Classification Challenge**, compuesto por comentarios de Wikipedia en inglés. La plataforma de comentarios, la API de publicación y los moderadores son simulados porque no se dispone de una plataforma real para realizar las pruebas.
 
 ## Inicio rápido
 
@@ -40,20 +40,11 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3. Preparar el dataset Jigsaw
+### 3. Preparar Jigsaw
 
-Descarga y coloca los archivos del dataset en la carpeta `data/`:
+Descarga `train.csv` desde Kaggle y colócalo en `data/train.csv`. Las instrucciones detalladas se encuentran en [`data/README.md`](data/README.md).
 
-```text
-data/
-├── train.csv
-├── test.csv
-└── test_labels.csv
-```
-
-Las instrucciones detalladas se encuentran en [`data/README.md`](data/README.md).
-
-El archivo `train.csv` es obligatorio para entrenar el modelo de producción. El proyecto no utiliza automáticamente el corpus sintético como respaldo.
+El archivo `train.csv` es obligatorio para entrenar el modelo de producción. El entrenamiento no sustituye automáticamente Jigsaw por el corpus sintético. El corpus sintético solo se utiliza en las pruebas automáticas.
 
 ### 4. Entrenar y evaluar el clasificador
 
@@ -64,18 +55,16 @@ python -m safefeed.train
 Este comando:
 
 1. Lee `data/train.csv`.
-2. Divide los datos en 70 % para entrenamiento y 30 % para prueba.
-3. Entrena el clasificador con la partición de entrenamiento.
-4. Evalúa el modelo sobre la partición de prueba.
-5. Evalúa adicionalmente sobre `test.csv` y `test_labels.csv` si ambos archivos están disponibles.
-6. Guarda el modelo y las métricas.
+2. Divide los datos en 70 % para entrenamiento, 15 % para validación y 15 % para prueba.
+3. Entrena candidatos con regresión logística original y con `class_weight="balanced"`.
+4. Selecciona el candidato y el umbral usando únicamente validation.
+5. Evalúa una sola vez el candidato elegido sobre test.
+6. Guarda el modelo y las métricas en `models/` y `reports/`.
 
 ### 5. Ejecutar el agente
 
-# 1) Descargar train.csv de Jigsaw y copiarlo en data/train.csv (ver "Datos")
-python -m safefeed.train                  # entrena el clasificador y mide en un conjunto de prueba
-python -m safefeed.runner --steps 3000 --seed 7   # corre el agente contra la plataforma simulada
-python -m pytest -q                       # pruebas automáticas
+```bash
+python -m safefeed.runner --steps 3000 --seed 7
 ```
 
 ### 6. Ejecutar las pruebas automáticas
@@ -84,27 +73,29 @@ python -m pytest -q                       # pruebas automáticas
 python -m pytest -q
 ```
 
-Las pruebas automáticas utilizan un corpus sintético pequeño y controlado para comprobar el comportamiento del agente. Este corpus no se utiliza para reportar el desempeño real del clasificador.
+Las pruebas automáticas utilizan un corpus sintético pequeño y controlado para comprobar la lógica del agente. Ese corpus no se utiliza para reportar el desempeño real del clasificador.
 
 ## Salidas generadas
 
-Los comandos generan los siguientes archivos:
+Los comandos generan o actualizan los siguientes archivos:
 
 ```text
 models/toxicity_model.joblib
 reports/offline_metrics.json
 reports/last_run_summary.json
+reports/policy_calibration.json
 logs/run_<fecha>.jsonl
 ```
 
 - `toxicity_model.joblib`: modelo entrenado.
-- `offline_metrics.json`: métricas del clasificador sobre Jigsaw.
-- `last_run_summary.json`: métricas de la última simulación.
-- `run_<fecha>.jsonl`: registro detallado de la ejecución.
+- `offline_metrics.json`: selección, calibración y evaluación final del clasificador Jigsaw.
+- `last_run_summary.json`: métricas del agente y del simulador.
+- `policy_calibration.json`: barrido de políticas de utilidad en validation simulada.
+- `run_<fecha>.jsonl`: registro detallado de una ejecución.
 
 ## Ablaciones para la Fase 3
 
-Para estudiar el aporte de cada componente, pueden ejecutarse las siguientes variantes:
+Para estudiar el aporte de cada componente, pueden ejecutarse estas variantes:
 
 ```bash
 python -m safefeed.runner \
@@ -122,41 +113,48 @@ python -m safefeed.runner \
   --tag sin_coordinacion
 ```
 
-Para iteraciones rápidas se puede usar `python -m safefeed.train --max-rows 40000`; el runner
-reentrena por defecto cada 200 etiquetas nuevas y permite ajustarlo con `--retrain-every`.
+Para iteraciones rápidas puede usarse una muestra de desarrollo:
+
+```bash
+python -m safefeed.train --max-rows 40000
+```
+
+Las métricas obtenidas con `--max-rows` deben identificarse como resultados de desarrollo y no como resultados finales del modelo completo.
+
+El runner reentrena por defecto cada 200 etiquetas nuevas y permite modificarlo con:
+
+```bash
+python -m safefeed.runner --steps 3000 --retrain-every 200
+```
 
 ## Datos y evaluación del clasificador
 
-1. Aceptar las reglas de la competencia en
-   <https://www.kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge> y descargar `train.csv`.
-2. Copiarlo en `data/train.csv` (columnas: `id, comment_text, toxic, severe_toxic, obscene, threat, insult, identity_hate`).
-3. Ejecutar `python -m safefeed.train`. En la salida, `"data_source"` debe decir `"jigsaw"`.
-4. Calibrar la política en una semilla de validación simulada, distinta del test final:
-   `python -m safefeed.calibrate --steps 3000 --seed 7`. El barrido y los objetivos quedan en
-   `reports/policy_calibration.json`.
+Para preparar Jigsaw:
 
-`train.csv` no se versiona porque está en .gitignore, por lo que cada persona debe descargarlo. El entrenamiento normal no sustituye silenciosamente un corpus Jigsaw ausente por datos sintéticos. Las pruebas automáticas usan su corpus sintético de prueba.
+1. Acepta las reglas de la competencia en <https://www.kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge>.
+2. Descarga `train.csv`.
+3. Copia el archivo en `data/train.csv`.
+4. Ejecuta `python -m safefeed.train`.
 
-### División del dataset
+El archivo debe contener estas columnas:
 
-El archivo `train.csv` se divide de la siguiente forma:
+```text
+id, comment_text, toxic, severe_toxic, obscene, threat, insult, identity_hate
+```
 
-- **Limpieza de texto** (`safefeed/text.py`): minúsculas, normalización Unicode, eliminación de URLs,
-  reducción de letras repetidas (3 o más pasan a 2) y colapso de espacios.
-- **Vectorización** (`safefeed/model.py`): TF-IDF de palabras (1–2-gramas) y de caracteres (2–5-gramas,
-  que dan algo de robustez ante escritura evasiva como "1d10t").
-- **División reproducible:** 70 % train / 15 % validation / 15 % test, estratificada por `toxic`,
-  con semilla fija 42 por defecto. Los vectores TF-IDF se ajustan solo con train. No se sobremuestrean
-  validation ni test.
-- **Desbalance:** se entrenan dos candidatos sobre el mismo train: regresión logística original y
-  `class_weight="balanced"`. Validation compara los dos; test se usa una sola vez para reportar el
-  candidato elegido, nunca para escoger pesos, umbral o política.
-- **Calibración:** validation evalúa umbrales 0,10–0,70 en pasos de 0,05. Se prioriza FNR dañino
-  ≤10 % y FPR ≤5 %; si ambos límites no son alcanzables, el reporte lo indica y hace explícito el
-  compromiso. El umbral final queda persistido en el modelo y el barrido completo está en
-  `reports/offline_metrics.json`.
-- Se reportan precisión, recall, F1, exactitud, AUC-ROC, AUC-PR, matriz de confusión y conteos de
-  falsos positivos/negativos. El objetivo inicial de F1 es ≥0,75 y no se oculta si no se alcanza.
+El entrenamiento comprueba que la fuente sea Jigsaw y genera el reporte en `reports/offline_metrics.json`. El conjunto oficial `test.csv` de Kaggle no se utiliza para las métricas finales cuando sus etiquetas están ocultas o tienen el valor `-1`. La evaluación principal se realiza sobre la partición interna de test, separada antes de entrenar y no utilizada para seleccionar el modelo ni el umbral.
+
+### Preparación y división del dataset
+
+- **Limpieza de texto** (`safefeed/text.py`): minúsculas, normalización Unicode, eliminación de URLs, reducción de letras repetidas y colapso de espacios.
+- **Vectorización** (`safefeed/model.py`): TF-IDF de palabras de tamaño 1–2 y de caracteres de tamaño 2–5.
+- **División reproducible:** 70 % train / 15 % validation / 15 % test, estratificada por `toxic`, con semilla 42 por defecto.
+- **Ausencia de fuga:** los vectores TF-IDF se ajustan con train; validation y test no se utilizan para ajustar el vectorizador ni para entrenar.
+- **Selección:** validation compara el modelo original y el modelo con `class_weight="balanced"`, y calibra los umbrales de 0,10 a 0,70.
+- **Evaluación final:** test se utiliza una sola vez después de seleccionar el modelo y el umbral.
+- **Métricas:** se reportan precisión, recall, F1, exactitud, AUC-ROC, AUC-PR, matriz de confusión y tasas de falsos positivos y negativos.
+
+Debido al desbalance de clases, la exactitud siempre se compara con la línea base que predice “no tóxico” para todos los comentarios.
 
 ## Dónde está el ciclo percepción → decisión → acción
 
@@ -164,121 +162,119 @@ El ciclo principal está implementado en la clase `SafeFeedAgent`, ubicada en [`
 
 | Fase | Método | Función |
 |---|---|---|
-| Percepción | `perceive()` | Limpia el texto, tokeniza y calcula señales de coordinación con la memoria de corto plazo |
-| Decisión | `decide()` | Probabilidad de toxicidad + subcategoría → probabilidad efectiva → utilidad esperada de cada acción → elige la mayor |
-| Acción | `act()` | Llama a la API de publicación (bloquear / ocultar / publicar), con un reintento si falla |
-| Aprendizaje | `receive_feedback()`, `retrain()` | Incluye auditorías posteriores de comentarios publicados y reentrena periódicamente con ejemplos recientes |
-| Ciclo | `step()` | Encadena percepción → decisión → acción y escribe cada fase en el log |
+| Percepción | `perceive()` | Limpia el texto, lo tokeniza y calcula señales de coordinación con la memoria de corto plazo. |
+| Decisión | `decide()` | Combina toxicidad, subcategorías, coordinación y utilidad esperada. |
+| Acción | `act()` | Ejecuta la acción mediante la API simulada, con reintentos y fallback seguro a revisión. |
+| Aprendizaje | `receive_feedback()` y `retrain()` | Incorpora feedback de moderadores y auditorías posteriores. |
+| Ciclo completo | `step()` | Encadena percepción, decisión y acción y registra cada fase. |
 
-- El texto.
-- El identificador del usuario.
-- La marca de tiempo.
-- El hilo de conversación.
-- Las señales calculadas a partir de comentarios recientes.
-
-La retroalimentación llega posteriormente desde los moderadores simulados.
+El agente recibe el texto, el usuario, la hora, el hilo y las señales calculadas a partir de comentarios recientes. No recibe directamente la etiqueta verdadera durante la decisión.
 
 ## Coherencia con el tipo de agente
 
-- **Aprendizaje:** el modelo (`safefeed/model.py`) se reentrena con ejemplos confirmados/revertidos por
-  moderadores y auditorías posteriores de publicaciones. Se registran TP/TN/FP/FN; un FN publicado se
-  conserva en el buffer, se reentrena y se prueba el cambio posterior de probabilidad/decisión.
-  El buffer es acotado, pondera más los ejemplos recientes y cada reentrenamiento incrementa la versión.
-- **Utilidad:** [`safefeed/utility.py`](safefeed/utility.py) compara las tres acciones con
-  `EU(a) = p_ef · U(a | dañino) + (1 − p_ef) · U(a | benigno)`, donde `p_ef` combina la
-  probabilidad del modelo con la señal de coordinación y los términos "dañino" se escalan por
-  severidad (amenaza, odio, toxicidad severa). Los valores están en `safefeed/config.py`
-  (`UtilityConfig`). En la política elegida en validación las regiones base quedan en ~0.02
-  (publicar → ocultar) y ~0.68 (ocultar → bloquear). Se calculan y registran en cada reporte.
+SafeFeed-Agent es un agente de aprendizaje con componente basado en utilidad y memoria de corto plazo.
 
-Las barreras configurables fuerzan `block` ante amenazas explícitas y toxicidad severa de alta
-confianza, `hide_for_review` ante odio identitario grave y `block` ante ataques coordinados de alta
-confianza. El resto de los casos sigue usando la función de utilidad esperada.
+### Aprendizaje
+
+El modelo se reentrena con ejemplos confirmados o revertidos por moderadores y con auditorías posteriores. Cada ejemplo conserva la clasificación observada como TP, TN, FP o FN. El buffer de feedback es acotado, pondera más los ejemplos recientes y cada reentrenamiento incrementa la versión del modelo.
+
+### Utilidad
+
+La función de utilidad está implementada en [`safefeed/utility.py`](safefeed/utility.py):
+
+```text
+EU(a) = p_ef · U(a | dañino) + (1 − p_ef) · U(a | benigno)
+```
+
+El agente compara las acciones `block`, `hide_for_review` y `publish` y escoge la de mayor utilidad esperada. `p_ef` combina la probabilidad de toxicidad con la señal de coordinación. La severidad aumenta cuando se detectan amenazas, odio identitario o toxicidad severa.
+
+También existen barreras configurables para forzar una respuesta segura ante amenazas explícitas, toxicidad severa de alta confianza, odio identitario grave y ataques coordinados de alta confianza.
 
 ## Coordinación, fallas y logs
 
-- La memoria usa una ventana móvil de **120 segundos simulados** (configurable); la similitud es
-  Jaccard `|A ∩ B| / |A ∪ B|` sobre tokens distintivos. Se descartan frases comunes y textos con menos
-  de tres tokens distintivos; se cuentan usuarios distintos y ráfagas de una cuenta. La coordinación
-  por sí sola no escala comentarios benignos: la utilidad exige señal tóxica.
-- Una fracción configurable de publicaciones se audita después de publicada. Así se detectan FNs
-  que nunca entrarían a la cola de revisión. El reporte separa pre/post deriva; el evento `retrain`
-  compara el ajuste del buffer antes/después y registra la versión del modelo.
-- Entradas inválidas, señal de coordinación sin datos y respuestas API inválidas/no disponibles
-  fallan de forma cerrada a revisión. La API se reintenta; si publicar/bloquear falla se intenta
-  `hide_for_review`. Los errores quedan explícitos en el log.
-- Los logs usan `text_hash` SHA-256 en vez del texto y registran coordinación, probabilidades,
-  utilidades, acción ejecutada, API, latencia, versión y error. `ground_truth` queda separado y
-  marcado como procedente del simulador o de feedback del moderador.
+- La memoria usa una ventana móvil de 120 segundos simulados.
+- La similitud se calcula mediante Jaccard sobre tokens distintivos.
+- Se cuentan usuarios distintos y ráfagas de una misma cuenta.
+- La coordinación por sí sola no escala comentarios benignos; debe existir señal de toxicidad.
+- Las entradas inválidas fallan de forma cerrada a `hide_for_review`.
+- La API se reintenta y, si `publish` o `block` no se ejecutan, se intenta `hide_for_review` como fallback seguro.
+- Los errores se registran dentro del evento `action` mediante `attempts`, `api_ok`, `status` y `error`.
+- Los logs utilizan `text_hash` SHA-256 en vez del texto completo.
+- `ground_truth` aparece separado y solo lo genera el simulador o el feedback del moderador para calcular métricas.
+
+Cada ejecución genera un archivo JSON Lines con eventos como:
+
+```text
+run_start
+percept
+decision
+action
+ground_truth
+feedback
+retrain
+run_end
+```
 
 ## Los siete componentes de la arquitectura
 
 | Componente | Implementación |
 |---|---|
 | Percepción y manejo de entradas | `SafeFeedAgent.perceive()`, `text.py` y TF-IDF en `model.py`. |
-| Planificación y descomposición | `SafeFeedAgent.step()`: probabilidad de toxicidad → coordinación → riesgo → acción. |
-| Memoria | `ShortTermMemory` conserva comentarios recientes. El modelo conserva los datos etiquetados y el búfer de retroalimentación. |
-| Razonamiento y decisión | `SafeFeedAgent.decide()` y `utility.py` calculan la utilidad esperada de cada acción. |
+| Planificación y descomposición | `SafeFeedAgent.step()`: toxicidad → coordinación → riesgo → acción. |
+| Memoria | `ShortTermMemory` conserva comentarios recientes; el modelo conserva datos etiquetados y feedback. |
+| Razonamiento y decisión | `SafeFeedAgent.decide()` y `utility.py`. |
 | Llamada de herramientas | `SafeFeedAgent.act()` llama a `PublicationAPI.execute()`. |
-| Comunicación | El agente se comunica con la API simulada y envía los casos ocultos a la cola de revisión humana. |
+| Comunicación | El agente se comunica con la API y con la cola de revisión humana. |
 | Aprendizaje y adaptación | `receive_feedback()`, `retrain()` y `ToxicityModel.update()`. |
 
 ## Entorno simulado
 
-El entorno se implementa en [`safefeed/simulator.py`](safefeed/simulator.py).
-
-El simulador genera las percepciones descritas en el diseño y permite probar el agente sin utilizar una plataforma real.
+El entorno se implementa en [`safefeed/simulator.py`](safefeed/simulator.py). La plataforma, los usuarios, las cuentas coordinadas, los tiempos, la API y los moderadores son simulados.
 
 | Propiedad | Implementación |
 |---|---|
-| Parcialmente observable | El agente recibe texto y metadatos, pero no recibe la etiqueta verdadera. |
-| Estocástico | Se generan llegadas aleatorias, fallos de API, errores de moderadores y tiempos de respuesta variables. |
-| Secuencial | Las decisiones dependen de los comentarios recientes almacenados en memoria. |
-| Dinámico | Aparecen oleadas coordinadas y deriva de vocabulario durante la ejecución. |
-| Discreto | El agente selecciona entre bloquear, ocultar o publicar. |
-| Multiagente | Participan usuarios, cuentas coordinadas, moderadores y el sistema de publicación. |
+| Parcialmente observable | El agente recibe texto y metadatos, pero no la etiqueta verdadera. |
+| Estocástico | Hay llegadas aleatorias, fallos de API, errores de moderadores y tiempos variables. |
+| Secuencial | Las decisiones dependen de comentarios recientes. |
+| Dinámico | Aparecen oleadas coordinadas y deriva de vocabulario. |
+| Discreto | El agente elige entre bloquear, ocultar o publicar. |
+| Multiagente | Participan usuarios, bots coordinados, moderadores y plataforma. |
 
-La misma semilla produce el mismo flujo de comentarios y las mismas decisiones del agente. Las marcas de tiempo reales de los logs pueden variar entre ejecuciones.
+Los comentarios del simulador son frases sintéticas diseñadas para representar toxicidad, amenazas, escritura evasiva, ataques coordinados y deriva de vocabulario. No son comentarios originales de Jigsaw. Por eso, la evaluación offline del clasificador y la evaluación del agente en el simulador son resultados diferentes.
 
-El simulador contiene frases sintéticas diseñadas para representar:
+## Qué hace el código y qué hacen las herramientas externas
 
-- Comentarios benignos.
-- Insultos.
-- Amenazas.
-- Discurso de odio.
-- Escritura evasiva.
-- Ataques coordinados.
-- Deriva de vocabulario.
-
-Estos comentarios no son los comentarios originales de Jigsaw. Por esta razón, los resultados offline sobre Jigsaw y los resultados de la simulación no deben interpretarse como la misma métrica.
-
-## Registro de ejecución
-
-Cada ejecución genera un archivo JSON Lines en la carpeta `logs/`.
-
-Cada evento contiene:
-
-| Qué cambió | Por qué |
+| Parte | Responsable |
 |---|---|
-| Plataforma, API de publicación y moderadores son **simulados** | No hay acceso a una plataforma real; el enunciado permite un simulador que respete las propiedades del ambiente |
-| Los comentarios del simulador son **sintéticos** (de plantilla), aunque el modelo se entrena con Jigsaw | Hace falta un flujo con olas de ataque coordinado y deriva de vocabulario, que Jigsaw no contiene |
-| "Riesgo bajo / intermedio / grave" **no son umbrales fijos**: son las regiones donde gana cada acción en la utilidad esperada | Es la forma coherente de un agente basado en utilidad; las regiones dependen de `UtilityConfig`, de la severidad y de la ola |
-| Subcategorías = las 5 de Jigsaw (`severe_toxic`, `obscene`, `threat`, `insult`, `identity_hate`) | Son las etiquetas del dataset de referencia |
-| La latencia se mide desde percepción hasta ejecución de la acción en el prototipo (media, mediana, p95, máximo y desviación); la carga humana es el número de comentarios enviados a revisión | No existe línea base de moderación manual; no se afirma una reducción frente a moderadores humanos |
-| Los moderadores simulados revisan la cola de "ocultos" y atienden apelaciones al 8 % de los bloqueos | Es la fuente de retroalimentación del diseño (confirmación/reversión) |
-| Se añadieron las banderas `--no-learning` y `--no-coordination` | Permiten las ablaciones de la Fase 3 |
+| Ciclo percepción → decisión → acción | Código propio en Python |
+| Memoria, coordinación y utilidad | Código propio |
+| Simulador, métricas y aprendizaje | Código propio |
+| Vectorización TF-IDF | scikit-learn |
+| Regresión logística | scikit-learn |
+| Lectura del dataset | pandas |
+| Persistencia del modelo | joblib |
+| Modelos de lenguaje | No se utiliza ningún LLM |
+
+Ninguna decisión del agente depende de un modelo de lenguaje externo.
+
+## Cambios respecto al diseño inicial
+
+| Cambio | Justificación |
+|---|---|
+| La plataforma, la API y los moderadores son simulados | No se dispone de una plataforma real y el enunciado permite construir un simulador. |
+| Los comentarios del simulador son sintéticos | Jigsaw no contiene oleadas, usuarios coordinados, tiempos ni deriva de vocabulario. |
+| Se utiliza división 70/15/15 | Se añadió validation para seleccionar el modelo y calibrar el umbral sin utilizar test. |
+| La latencia se reporta como medida del prototipo | No existe una línea base real de moderación humana para afirmar una reducción de tiempo. |
+| Se añadieron auditorías posteriores | Permiten detectar algunos falsos negativos publicados y alimentar el aprendizaje. |
+| Se añadieron `--no-learning` y `--no-coordination` | Permiten realizar ablaciones en la Fase 3. |
 
 ## Resultados y umbrales de aceptación
 
-Los valores medidos se guardan en `reports/offline_metrics.json` y
-`reports/last_run_summary.json` al ejecutar los comandos de entrenamiento y simulación. El primero
-contiene la evaluación final **solo en test** y, por separado, la comparación de modelos/calibración
-hecha en validation. El segundo separa `classifier`, `agent` y `simulator`; sus AUC pertenecen al
-clasificador, nunca a la contención de ataques.
+Los valores medidos se guardan en `reports/offline_metrics.json` y `reports/last_run_summary.json`.
 
 ### Clasificador Jigsaw
 
-Ejecución completa con seed 42; selección y calibración en validation, evaluación final en test:
+Resultados documentados de la ejecución completa con semilla 42:
 
 | Elemento | Resultado |
 |---|---:|
@@ -291,89 +287,77 @@ Ejecución completa con seed 42; selección y calibración en validation, evalua
 | AUC-ROC / AUC-PR | 0,9806 / 0,8977 |
 | Matriz de confusión `[[TN, FP], [FN, TP]]` | `[[20732, 910], [263, 2031]]` |
 
-En validation, el candidato original con umbral 0,15 logró recall 85,22 % y FPR 3,84 %;
-el balanceado con 0,35 logró recall 86,62 % y FPR 4,55 %. Se eligió el balanceado por mayor
-recall bajo el límite FPR, aunque su F1 de validation fue menor (75,48 % frente a 76,98 %).
-El F1 supera el objetivo inicial de 0,75. En validation, ningún umbral de la rejilla logró
-simultáneamente FNR ≤10 % y FPR ≤5 %; se escogió el mejor recall dentro del límite FPR y el reporte
-conserva ese aviso. El barrido no usa el test.
+El F1 supera el objetivo inicial de 0,75. El reporte también conserva si los objetivos de FNR y FPR no pueden cumplirse simultáneamente.
 
-### Política y simulación final
+### Política y simulación
 
-`python -m safefeed.calibrate --steps 3000 --seed 7` seleccionó
-`publish_harmful=-10.0` minimizando daño publicado entre políticas que cumplen recall ≥90 %,
-falsos bloqueos ≤5 % y contención ≥90 %. La región base correspondiente es `publish` [0, 0,0231),
-`hide_for_review` [0,0231, 0,6801) y `block` [0,6801, 1]; coordinación, severidad y barreras
-configurables pueden cambiar la acción final.
-En la semilla de validación, esta política logró 0 % de dañinos publicados, 3,24 % de falsos
-bloqueos benignos y 100 % de contención; el benigno enviado a revisión fue 22,71 %.
+La política se puede calibrar con:
 
-Evaluación reproducible: `python -m safefeed.runner --steps 3000 --seed 17 --no-learning`,
-3.000 comentarios sintéticos (aprendizaje desactivado para
-medir la política fija; el ciclo de aprendizaje tiene pruebas específicas):
+```bash
+python -m safefeed.calibrate --steps 3000 --seed 7
+```
 
-| Métrica del agente | Resultado |
-|---|---:|
-| Accuracy (baseline publicar siempre) | 80,43 % (79,30 %) |
-| Precisión / recall / F1 de la acción del agente | 51,42 % / 99,36 % / 67,76 % |
-| Dañinos publicados | 0,64 % |
-| Falsos bloqueos benignos | 2,61 % |
-| Benignos enviados a revisión (separado) | 21,90 % |
-| Contención de ataques | 331/331 = 100 % |
-| Ataques publicados antes de la primera contención | 0 |
-| Latencia media / mediana / p95 / máxima / desv. estándar | 2,937 / 2,743 / 3,445 / 133,662 / 3,376 ms |
-| Errores API simulados | 31; los 31 se manejaron de forma segura |
-| Matriz de fallas inyectadas | 11/11 manejadas correctamente (100 %) |
+El barrido se guarda en `reports/policy_calibration.json`. La evaluación final del agente se ejecuta con:
 
-La contención fue 166/166 antes de la deriva y 165/165 después; las dos campañas tuvieron 100 %
-de contención (media 100 %, desviación 0, mínimo 100 %, máximo 100 %). Los benignos enviados a
-revisión no se cuentan como falsos bloqueos. La latencia p95 cumple 100 ms aunque hubo un máximo
-aislado de 133,662 ms. Es latencia del prototipo en este entorno de ejecución, **no** una comparación
-con moderadores humanos.
+```bash
+python -m safefeed.runner --steps 3000 --seed 17 --no-learning
+```
 
-Las métricas por fase están en `by_phase`; el rendimiento del clasificador en el flujo sintético
-está separado del F1 Jigsaw de test. La simulación final desactivó aprendizaje, así que no se afirma
-que esa corrida mida mejora adaptativa: `tests/test_performance_safety.py` verifica un falso negativo
-publicado, su incorporación al buffer, reentrenamiento y cambio de probabilidad/acción; las corridas
-con aprendizaje habilitado registran comparaciones por versión.
+Las medidas principales son:
 
 | Medida | Umbral inicial | Campo de reporte |
 |---|---:|---|
-| F1 del clasificador | ≥0,75 | `final_test.f1` |
-| Dañinos publicados | ≤10 % | `agent.harmful_published_rate` |
-| Falsos bloqueos benignos | ≤5 % | `agent.false_block_rate` |
-| Benignos enviados a revisión | Informativo, separado de falsos bloqueos | `agent.benign_sent_to_review_rate` |
-| Contención de ataques | ≥90 % | `simulator.attacks.contained_rate`, por campaña y fase |
-| Latencia de prototipo | p95 ≤100 ms | `agent.latency_ms_p95` |
-| Manejo seguro de fallas inyectadas (entrada, sensor y API) | ≥95 % | `failure_handling.safe_failure_handling_rate` |
+| F1 del clasificador | ≥ 0,75 | `final_test.f1` |
+| Comentarios dañinos publicados | ≤ 10 % | `agent.harmful_published_rate` |
+| Falsos bloqueos benignos | ≤ 5 % | `agent.false_block_rate` |
+| Contención de ataques | ≥ 90 % | `simulator.attacks.contained_rate` |
+| Latencia del prototipo | p95 ≤ 100 ms | `agent.latency_ms_p95` |
+| Manejo seguro de fallas | ≥ 95 % | `failure_handling.safe_failure_handling_rate` |
 
-La latencia corresponde al entorno de ejecución del prototipo, desde percepción hasta respuesta de
-la acción; **no** es una comparación contra moderadores humanos. Los resultados del simulador usan
-comentarios sintéticos y no se deben presentar como desempeño real en producción.
+La latencia corresponde al entorno de ejecución del prototipo y no es una comparación contra moderadores humanos. Los resultados del simulador utilizan comentarios sintéticos y no deben presentarse como desempeño real en producción.
 
-### Evaluación del agente en el entorno simulado
+## Limitaciones conocidas
 
-La simulación se ejecuta con:
+- El modelo se entrena con comentarios en inglés de Wikipedia y no tiene soporte multilingüe.
+- Los comentarios del simulador no son los comentarios originales de Jigsaw.
+- La deriva de vocabulario puede reducir el desempeño.
+- Las auditorías cubren una muestra de publicaciones; los falsos negativos no auditados siguen sin etiqueta.
+- El reentrenamiento reconstruye el modelo completo y puede tardar más con todo Jigsaw.
+- El dataset original puede contener sesgos que este prototipo no mitiga completamente.
+- Los logs almacenan hashes del texto y no el texto completo, pero en una plataforma real también deberían aplicarse políticas de retención y control de acceso.
 
-- Las auditorías simuladas cubren una muestra de publicaciones, no todas; los falsos negativos no
-  auditados siguen sin etiqueta. La exactitud posterior al reentrenamiento del buffer es una medida
-  de ajuste sobre feedback, no una evaluación independiente.
-- Inglés únicamente (el dataset de referencia es de Wikipedia en inglés); no hay soporte multilingüe.
-- Reentrenar re-ajusta todo el modelo: con Jigsaw completo (~160 000 filas) tarda varios segundos o minutos
-  por reentrenamiento; usar `--max-rows` al entrenar o subir `--retrain-every`.
-- El simulador no reproduce comentarios reales de Jigsaw, por lo que el modelo puede rendir distinto sobre el flujo simulado que en la evaluación offline.
-- Sesgos del dataset original (comentarios de Wikipedia) no se mitigan aquí; es un riesgo ético declarado en el diseño.
-
-Los resultados se guardan en:
+## Estructura del proyecto
 
 ```text
-reports/last_run_summary.json
-```
-safefeed/        agent.py (ciclo) · utility.py · coordination.py · model.py · simulator.py
-                 data.py · text.py · metrics.py · logger.py · train.py · runner.py · config.py · schemas.py
-tests/           pruebas de utilidad, coordinación, ciclo, logs, fallas, métricas, simulador y aprendizaje
-examples/        sample_run.jsonl — ejemplo corto de log
-data/ models/ logs/ reports/   entradas y salidas (se regeneran)
+safefeed/
+├── agent.py          # Ciclo percepción → decisión → acción
+├── utility.py        # Función de utilidad
+├── coordination.py   # Memoria y coordinación
+├── model.py          # Modelo de toxicidad
+├── simulator.py      # Entorno simulado
+├── data.py           # Carga de Jigsaw y datos de prueba sintéticos
+├── text.py           # Limpieza y tokenización
+├── metrics.py        # Métricas
+├── logger.py         # Registro de ejecución
+├── train.py          # Entrenamiento y evaluación
+├── runner.py         # Ejecución del agente
+├── calibrate.py      # Calibración de política
+├── config.py         # Configuración
+└── schemas.py        # Estructuras de datos
+
+tests/
+├── conftest.py
+├── test_agent_simulator_log.py
+├── test_text_utility_coordination.py
+└── test_performance_safety.py
+
+scripts/
+└── validate_dataset  # Validación del dataset Jigsaw
+
+examples/
+└── sample_run.jsonl  # Ejemplo de log
+
+data/ models/ logs/ reports/  # Entradas y salidas regenerables
 ```
 
 ## Referencias

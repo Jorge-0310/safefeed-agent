@@ -16,6 +16,8 @@ LABELS = [
 ]
 
 REQUIRED_COLUMNS = ["id", "comment_text", *LABELS]
+SEEDS = [7, 21, 42, 84, 123]
+STRATIFICATION_THRESHOLD = 0.001
 
 
 def main():
@@ -53,30 +55,93 @@ def main():
     print("\n[4] Valores de etiquetas")
     print(f"Etiquetas inválidas: {invalid_labels}")
 
-    # Supuesto 5: división estratificada 70/30
-    full_rate = df["toxic"].mean()
-    train_df, test_df = train_test_split(
-        df,
-        test_size=0.30,
-        stratify=df["toxic"],
-        random_state=42,
-    )
+    # Supuesto 5: división estratificada reproducible
+    full_rate = float(df["toxic"].mean())
+    stratification_results = []
 
-    train_rate = train_df["toxic"].mean()
-    test_rate = test_df["toxic"].mean()
+    for seed in SEEDS:
+        train_df, test_df = train_test_split(
+            df,
+            test_size=0.30,
+            stratify=df["toxic"],
+            random_state=seed,
+        )
 
-    print("\n[5] División estratificada 70/30")
+        train_rate = float(train_df["toxic"].mean())
+        test_rate = float(test_df["toxic"].mean())
+
+        train_difference = abs(train_rate - full_rate)
+        test_difference = abs(test_rate - full_rate)
+
+        stratification_results.append(
+            {
+                "seed": seed,
+                "train_rate": train_rate,
+                "test_rate": test_rate,
+                "train_difference": train_difference,
+                "test_difference": test_difference,
+            }
+        )
+
+    train_differences = [
+        result["train_difference"]
+        for result in stratification_results
+    ]
+
+    test_differences = [
+        result["test_difference"]
+        for result in stratification_results
+    ]
+
+    all_differences = train_differences + test_differences
+
+    print("\n[5] División estratificada reproducible 70/30")
     print(f"Tasa total de toxicidad: {full_rate:.6f}")
-    print(f"Tasa en entrenamiento: {train_rate:.6f}")
-    print(f"Tasa en prueba: {test_rate:.6f}")
+
+    for result in stratification_results:
+        print(
+            f"Semilla {result['seed']}: "
+            f"train={result['train_rate']:.6f}, "
+            f"test={result['test_rate']:.6f}, "
+            f"dif_train={result['train_difference']:.6f}, "
+            f"dif_test={result['test_difference']:.6f}"
+        )
+
     print(
-        "Diferencia entrenamiento: "
-        f"{abs(train_rate - full_rate):.6f}"
+        "Diferencia media: "
+        f"{sum(all_differences) / len(all_differences):.6f}"
     )
+
+    mean_difference = sum(all_differences) / len(all_differences)
+    variance = sum(
+        (difference - mean_difference) ** 2
+        for difference in all_differences
+    ) / len(all_differences)
+    std_difference = variance ** 0.5
+
+    print(f"Desviación estándar: {std_difference:.6f}")
+    print(f"Diferencia máxima: {max(all_differences):.6f}")
     print(
-        "Diferencia prueba: "
-        f"{abs(test_rate - full_rate):.6f}"
+        "¿Cumple el umbral de estratificación? "
+        f"{max(all_differences) <= STRATIFICATION_THRESHOLD}"
     )
+
+
+        train_rate = train_df["toxic"].mean()
+        test_rate = test_df["toxic"].mean()
+
+        print("\n[5] División estratificada 70/30")
+        print(f"Tasa total de toxicidad: {full_rate:.6f}")
+        print(f"Tasa en entrenamiento: {train_rate:.6f}")
+        print(f"Tasa en prueba: {test_rate:.6f}")
+        print(
+            "Diferencia entrenamiento: "
+            f"{abs(train_rate - full_rate):.6f}"
+        )
+        print(
+            "Diferencia prueba: "
+            f"{abs(test_rate - full_rate):.6f}"
+        )
 
     # Supuesto 6: longitud
     lengths = df["comment_text"].astype(str).str.len()

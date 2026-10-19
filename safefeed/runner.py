@@ -68,7 +68,23 @@ def run_simulation(
                        ground_truth={"labels": truth.labels, "is_toxic": truth.is_toxic,
                                      "kind": truth.kind, "phase": truth.phase,
                                      "campaign_id": truth.campaign_id, "source": "simulator"})
-        mods.consider(raw.comment_id, action_result.action, truth, raw.timestamp)
+        if action_result.ok:
+            mods.consider(
+                raw.comment_id,
+                action_result.action,
+                truth,
+                raw.timestamp,
+            )
+        elif logger:
+            logger.log(
+                "moderator_skipped",
+                raw.timestamp,
+                comment_id=raw.comment_id,
+                intended_action=decision.action.value,
+                reason="action_not_executed",
+                error=action_result.error,
+            )
+
         records.append({
             "comment_id": raw.comment_id, "action": action_result.action.value,
             "p_toxic": decision.p_toxic, "p_effective": decision.p_effective,
