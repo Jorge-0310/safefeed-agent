@@ -8,7 +8,6 @@ import numpy as np
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from .config import UtilityConfig
-from .schemas import Action
 from .utility import (apply_safety_overrides, choose_action, effective_probability,
                       expected_utilities, severity_multiplier)
 
