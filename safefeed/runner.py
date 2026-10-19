@@ -57,12 +57,19 @@ def run_simulation(
     for raw, truth in sim:
         for fb in mods.due(raw.timestamp):          # llegan veredictos de moderadores pendientes
             agent.receive_feedback(fb)
-        _, decision, _ = agent.step(raw, api)
+        _, decision, action_result = agent.step(raw, api)
         if logger:
             logger.log("ground_truth", raw.timestamp, comment_id=raw.comment_id, labels=truth.labels,
                        is_toxic=truth.is_toxic, kind=truth.kind, phase=truth.phase,
                        campaign_id=truth.campaign_id, source="simulator")
-        mods.consider(raw.comment_id, decision.action, truth, raw.timestamp)
+        if action_result.ok:
+            mods.consider(
+                raw.comment_id,
+                decision.action,
+                truth,
+                raw.timestamp,
+            )
+
         records.append({
             "comment_id": raw.comment_id, "action": decision.action.value,
             "p_toxic": decision.p_toxic, "p_effective": decision.p_effective,

@@ -64,7 +64,7 @@ python -m safefeed.train
 Este comando:
 
 1. Lee `data/train.csv`.
-2. Divide los datos en 80 % para entrenamiento y 20 % para prueba.
+2. Divide los datos en 70 % para entrenamiento y 30 % para prueba.
 3. Entrena el clasificador con la partición de entrenamiento.
 4. Evalúa el modelo sobre la partición de prueba.
 5. Evalúa adicionalmente sobre `test.csv` y `test_labels.csv` si ambos archivos están disponibles.
