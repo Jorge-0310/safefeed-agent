@@ -303,6 +303,88 @@ El barrido se guarda en `reports/policy_calibration.json`. La evaluación final 
 python -m safefeed.runner --steps 3000 --seed 17 --no-learning
 ```
 
+### Batería formal de escenarios C1–C11
+
+Ejecutar cinco repeticiones con semillas 1–5 y generar resultados vinculados a evidencia:
+
+```bash
+python -m safefeed.scenarios --seeds 1 2 3 4 5
+```
+
+El comando genera `reports/scenario_results.json` y un JSONL de evidencia en `logs/`. Cada caso
+registra entrada o plantilla reproducible, condición ambiental, acción y resultado esperados,
+semilla, número de repetición, resultado observado, hash del texto e índices de línea de los
+eventos `percept`, `decision`, `action`, `ground_truth` y `scenario_result`.
+
+| Código | Escenario | Acción o resultado esperado | Métrica principal |
+|---|---|---|---|
+| C1 | Comentario benigno normal | Publicar | Falsos bloqueos |
+| C2 | Insulto claro | Ocultar o bloquear; nunca publicar | Dañinos publicados |
+| C3 | Amenaza explícita | Ocultar o bloquear; nunca publicar | Dañinos publicados |
+| C4 | Ataque a identidad | Ocultar o bloquear; nunca publicar | Dañinos publicados |
+| C5 | Insulto con leetspeak | Ocultar o bloquear; nunca publicar | Dañinos publicados |
+| C6 | Sarcasmo ambiguo benigno | Publicar o revisar; no bloquear | Falsos bloqueos |
+| C7 | Texto benigno de 65.000 caracteres | Límite 20.000 caracteres; error y revisión segura sin inferencia | p95 de latencia |
+| C8 | Texto vacío y espacios | Registrar error y enviar a revisión | Manejo seguro de fallas |
+| C9 | Usuario/hilo ausente y timestamp NaN | Registrar cada error y enviar a revisión | Manejo seguro de fallas |
+| C10 | API siempre indisponible | Reintentar, registrar y no publicar inseguro | Manejo seguro de fallas |
+| C11 | Oleada de 25 comentarios coordinados | Contener ≥90 % | Contención de ataques |
+
+C1–C10 se repiten cinco veces cada uno; C8 y C9 incluyen dos y tres subcasos por repetición,
+respectivamente. C11 ejecuta cinco oleadas, una por semilla. Para las cinco mediciones de F1 se
+utiliza el modelo y umbral ya fijados y cinco particiones estratificadas muestreadas del holdout test
+reservado del split seed 42. No se recalibran pesos ni umbrales con estas particiones. Como las
+particiones proceden del mismo holdout, se solapan entre semillas y no son observaciones estadísticas
+independientes; se reportan como repetibilidad, no como cinco nuevos conjuntos Jigsaw independientes.
+
+Los criterios se fijan antes de la batería: F1 ≥0,75; dañinos publicados ≤10 %; falsos bloqueos
+≤5 %; contención de ataques ≥90 %; latencia p95 ≤100 ms; manejo seguro de fallas ≥95 %. Para cada
+métrica el reporte incluye los cinco resultados, media, desviación estándar poblacional, mínimo y
+máximo. Para F1, el umbral se evalúa sobre la media de las cinco particiones de test, mientras cada
+partición se muestra y se señala cualquier valor individual bajo 0,75. Para dañinos publicados,
+falsos bloqueos, contención, latencia y fallas deben pasar tanto la media como cada repetición. La
+batería mide más de 50 acciones en total combinando C1–C11 a través de las cinco semillas, y no
+compara latencia con moderadores humanos.
+
+El límite de comentario de 20.000 caracteres es una restricción explícita de seguridad/rendimiento
+en `AgentConfig.max_comment_chars`. Las entradas más largas (C7) se envían a revisión y se registran;
+no se rechazan silenciosamente ni se pasan a inferencia TF-IDF.
+
+El escenario C7 somete deliberadamente una entrada mucho mayor que la habitual; si provoca picos de
+latencia, se reportan sin excluirlos. C8–C10 contabilizan cada falla individual, incluidos los
+subcasos, sin retirar fallas que hayan terminado en revisión.
+
+#### Resultados medidos en cinco repeticiones
+
+Resultados de `reports/scenario_results.json` (modelo/umbral fijos; semillas 1–5):
+
+| Criterio | Resultados por semilla | Media | DE | Mín. | Máx. | Evaluación |
+|---|---|---:|---:|---:|---:|---|
+| F1 Jigsaw (particiones test) | 0,7765; 0,7418; 0,7670; 0,7860; 0,7945 | 0,7732 | 0,0182 | 0,7418 | 0,7945 | **Cumple por media**; una partición queda bajo 0,75 |
+| Dañinos publicados C2–C5/C11 | 0; 0; 0; 0; 0 % | 0 % | 0 % | 0 % | 0 % | **Cumple media y cada repetición** |
+| Falsos bloqueos C1/C6 | 0; 0; 0; 0; 0 % | 0 % | 0 % | 0 % | 0 % | **Cumple media y cada repetición** |
+| Contención C11 | 100; 100; 100; 100; 100 % | 100 % | 0 % | 100 % | 100 % | **Cumple media y cada repetición** |
+| p95 latencia por semilla (ms) | 4,532; 4,936; 4,480; 5,199; 4,769 | 4,783 | 0,265 | 4,480 | 5,199 | **Cumple media y cada repetición** |
+| Manejo seguro C8–C10 | 100; 100; 100; 100; 100 % | 100 % | 0 % | 100 % | 100 % | **Cumple media y cada repetición** |
+
+La F1 se acepta con el umbral predefinido sobre la **media**, no se oculta la variación: la semilla 2
+dio 0,7418. Las cinco particiones se muestrean del mismo holdout reservado y se solapan; son una
+prueba de sensibilidad a la partición, no cinco conjuntos independientes. Para las métricas de
+seguridad y operación se requiere que tanto media como todas las semillas pasen.
+
+En las 190 acciones de escenarios, la latencia total tuvo media 2,979 ms, mediana 2,758 ms, p95
+4,943 ms, máximo 11,001 ms y DE 1,739 ms. C7, de 65.000 caracteres, fue a revisión por el límite
+de entrada; su latencia media fue 10,393 ms (DE 0,450; mín. 9,615; máx. 11,001). C8 gestionó
+espacios/vacío, C9 sus tres metadatos inválidos y C10 cuatro intentos API fallidos por repetición;
+los tres escenarios acabaron en revisión y registraron la falla. C6 se envió a revisión en las cinco
+repeticiones: no cuenta como falso bloqueo, pero sí es una carga de revisión del 100 % para ese caso.
+
+Las cinco oleadas C11 contuvieron 25/25 comentarios cada una. C1 publicó el benigno; C2 y C3
+bloquearon; C4 y C5 ocultaron para revisión; C6 y C7 ocultaron para revisión; C8–C10 usaron la
+acción segura esperada. El log JSONL contiene eventos por comentario y referencias de línea en el
+reporte. No se generó captura de video ni minuto de video; la evidencia verificable disponible es
+el JSONL y el reporte estructurado.
+
 Las medidas principales son:
 
 | Medida | Umbral inicial | Campo de reporte |

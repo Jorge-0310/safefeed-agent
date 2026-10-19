@@ -9,6 +9,7 @@ from safefeed.config import CLASSIFIER_THRESHOLDS, LABELS, AgentConfig, UtilityC
 from safefeed.logger import RunLogger
 from safefeed.metrics import calibrate_utility_policy, compute_run_metrics
 from safefeed.runner import evaluate_failure_handling
+from safefeed.scenarios import SCENARIO_DEFINITIONS, _acceptance, _stats
 from safefeed.schemas import Action, ModeratorFeedback, Percept, RawComment
 from safefeed.simulator import ApiResponse
 from safefeed.train import calibrate_threshold
@@ -59,6 +60,17 @@ def test_invalid_comment_fails_closed_to_review(comment, base_model):
     assert decision.action == Action.HIDE
     assert result.ok and result.action == Action.HIDE
     assert decision.error
+
+
+def test_extremely_long_comment_fails_closed_before_model_inference(base_model):
+    agent = SafeFeedAgent(base_model)
+    _, decision, result = agent.step(
+        RawComment("too-long", "u", 1.0, "thread", "x" * 20001),
+        AlwaysOkAPI(),
+    )
+    assert decision.action == Action.HIDE
+    assert result.ok
+    assert "comment_too_long:20001>20000" in decision.error
 
 
 def test_absent_comment_and_coordination_sensor_data_fail_closed(base_model):
@@ -252,3 +264,22 @@ def test_utility_calibration_selects_safest_feasible_region():
     assert selected["meets_safety_targets"]
     assert result["selected_metrics"]["agent"]["harmful_published_rate"] <= 0.10
     assert result["selected_metrics"]["agent"]["false_block_rate"] <= 0.05
+
+
+def test_formal_scenario_catalog_and_acceptance_statistics():
+    assert set(SCENARIO_DEFINITIONS) == {
+        "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11",
+    }
+    assert all(
+        {"input", "environment", "expected_outcome", "expected_action", "metric"}
+        <= scenario.keys()
+        for scenario in SCENARIO_DEFINITIONS.values()
+    )
+    assert SCENARIO_DEFINITIONS["C7"]["input"]["repetitions"] == 1000
+    assert _stats([0.7, 0.8, 0.9]) == {
+        "n": 3, "mean": 0.8, "std": 0.08165, "min": 0.7, "max": 0.9,
+        "values": [0.7, 0.8, 0.9],
+    }
+    result = _acceptance([0.90, 0.91, 0.89, 0.93, 0.90], 0.90, "min", "recall")
+    assert result["mean_pass"] and not result["all_repetitions_pass"]
+    assert not result["pass"]

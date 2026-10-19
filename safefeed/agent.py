@@ -196,8 +196,7 @@ class SafeFeedAgent:
     def _text_hash(text: str) -> str:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-    @staticmethod
-    def _input_errors(raw: RawComment) -> List[str]:
+    def _input_errors(self, raw: RawComment) -> List[str]:
         if raw is None:
             return ["comment_missing"]
         errors = []
@@ -208,6 +207,10 @@ class SafeFeedAgent:
             errors.append("malformed_comment_text")
         elif not text.strip():
             errors.append("text_empty" if text == "" else "text_whitespace")
+        elif len(text) > self.cfg.max_comment_chars:
+            errors.append(
+                f"comment_too_long:{len(text)}>{self.cfg.max_comment_chars}"
+            )
         if not isinstance(getattr(raw, "comment_id", None), str) or not raw.comment_id.strip():
             errors.append("comment_id_missing")
         if not isinstance(getattr(raw, "user_id", None), str) or not raw.user_id.strip():

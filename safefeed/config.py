@@ -68,3 +68,4 @@ class AgentConfig:
     memory_max_items: int = 500
     similarity_threshold: float = 0.75  # Jaccard mínimo para considerar "casi duplicado"
     recent_feedback_max: int = 500
+    max_comment_chars: int = 20000
