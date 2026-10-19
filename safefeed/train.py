@@ -58,7 +58,7 @@ def train_and_save(
     report_path: Optional[Path] = REPORT_DIR / "offline_metrics.json",
 ) -> ToxicityModel:
     df, source = load_training_data(data_path, max_rows, seed)
-    train_df, test_df = train_test_split(df, test_size=0.2, stratify=df["toxic"], random_state=seed)
+    train_df, test_df = train_test_split(df, test_size=0.3, stratify=df["toxic"], random_state=seed)
 
     model = ToxicityModel(seed=seed)
     model.fit(train_df["comment_text"].tolist(), train_df[list(LABELS)].values)

@@ -89,18 +89,61 @@ class SafeFeedAgent:
 
     # ------------------------------------------------------------------ 3) ACCIÓN
     def act(self, decision: Decision, percept: Percept, api) -> ActionResult:
-        """Herramienta externa: API del sistema de publicación (con reintento)."""
-        attempts, resp = 0, None
-        for _ in range(1 + self.cfg.api_retries):
+        """Herramienta externa: API del sistema de publicación con reintentos."""
+
+        attempts = 0
+        resp = None
+
+        for attempt in range(1, 1 + self.cfg.api_retries + 1):
             attempts += 1
-            resp = api.execute(decision.action, decision.comment_id, percept.timestamp)
+
+            resp = api.execute(
+                decision.action,
+                decision.comment_id,
+                percept.timestamp,
+            )
+
             if resp.ok:
                 break
-        result = ActionResult(decision.comment_id, decision.action, resp.ok, resp.status, attempts)
-        # Solo lo que va a revisión o se bloquea puede recibir veredicto humano después.
-        if decision.action != Action.PUBLISH and self.cfg.learning_enabled:
+
+            if attempt <= self.cfg.api_retries:
+                self.logger.log(
+                    "action_retry",
+                    percept.timestamp,
+                    comment_id=decision.comment_id,
+                    action=decision.action.value,
+                    attempt=attempt,
+                    status=resp.status,
+                )
+
+        if not resp.ok:
+            self.logger.log(
+                "action_failed",
+                percept.timestamp,
+                comment_id=decision.comment_id,
+                action=decision.action.value,
+                attempts=attempts,
+                status=resp.status,
+            )
+
+        result = ActionResult(
+            decision.comment_id,
+            decision.action,
+            resp.ok,
+            resp.status,
+            attempts,
+        )
+
+        # Solo se aprende de acciones que sí fueron ejecutadas.
+        if (
+            result.ok
+            and decision.action != Action.PUBLISH
+            and self.cfg.learning_enabled
+        ):
             self._pending[decision.comment_id] = percept.text_raw
+
         return result
+
 
     # ------------------------------------------------------------------ ciclo completo
     def step(self, raw: RawComment, api) -> Tuple[Percept, Decision, ActionResult]:
