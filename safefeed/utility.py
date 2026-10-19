@@ -50,3 +50,38 @@ def choose_action(eu: Dict[str, float]) -> Action:
         if abs(eu[a.value] - best) < 1e-12:
             return a
     return Action.HIDE  # inalcanzable, por seguridad
+
+
+def apply_safety_overrides(
+    action: Action, p_effective: float, sub_probs: Dict[str, float],
+    surge: bool, cfg: UtilityConfig,
+) -> tuple[Action, str | None]:
+    if sub_probs.get("threat", 0.0) >= cfg.threat_block_threshold:
+        return Action.BLOCK, "explicit_threat"
+    if sub_probs.get("severe_toxic", 0.0) >= cfg.severe_toxicity_block_threshold:
+        return Action.BLOCK, "severe_toxicity"
+    if sub_probs.get("identity_hate", 0.0) >= cfg.identity_hate_hide_threshold:
+        return Action.HIDE, "identity_hate"
+    if surge and p_effective >= cfg.coordinated_attack_block_threshold:
+        return Action.BLOCK, "coordinated_attack"
+    return action, None
+
+
+def utility_action_regions(cfg: UtilityConfig) -> Dict[str, list]:
+    """Regiones base de p_ef donde cada acción maximiza EU (sin ola ni severidad)."""
+    steps = 10000
+    transitions = []
+    previous = choose_action(expected_utilities(0.0, 1.0, False, cfg))
+    start = 0.0
+    for i in range(1, steps + 1):
+        probability = i / steps
+        current = choose_action(expected_utilities(probability, 1.0, False, cfg))
+        if current != previous:
+            boundary = (i - 0.5) / steps
+            transitions.append((previous, start, boundary))
+            previous, start = current, boundary
+    transitions.append((previous, start, 1.0))
+    return {
+        action.value: [round(lo, 4), round(hi, 4)]
+        for action, lo, hi in transitions
+    }

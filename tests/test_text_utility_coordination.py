@@ -45,9 +45,9 @@ def test_surge_never_makes_agent_more_permissive():
 
 
 def test_surge_changes_a_borderline_case():
-    # p = 0.09: sin ola se publica; en una ola, dejar pasar daño duele más y se oculta.
-    assert _act(0.09, surge=False) == Action.PUBLISH
-    assert _act(0.09, surge=True) == Action.HIDE
+    # p = 0.02: sin ola se publica; en una ola el daño esperado pasa el umbral.
+    assert _act(0.02, surge=False) == Action.PUBLISH
+    assert _act(0.02, surge=True) == Action.HIDE
 
 
 def test_severity_multiplier_range():

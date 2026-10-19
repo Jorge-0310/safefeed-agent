@@ -1,0 +1,1165 @@
+{
+  "n_comments": 3000,
+  "toxic_rate": 0.2073,
+  "baseline_accuracy_always_publish": 0.7927,
+  "classifier_threshold": 0.35,
+  "classifier": {
+    "accuracy": 0.8263,
+    "precision": 0.5462,
+    "recall": 0.9598,
+    "f1": 0.6962,
+    "confusion_matrix": [
+      [
+        1882,
+        496
+      ],
+      [
+        25,
+        597
+      ]
+    ],
+    "true_negative": 1882,
+    "false_positive": 496,
+    "false_negative": 25,
+    "true_positive": 597,
+    "false_positive_rate": 0.2086,
+    "false_negative_rate": 0.0402,
+    "auc_roc": 0.9619,
+    "auc_pr": 0.8853,
+    "by_phase": {
+      "pre_drift": {
+        "n": 1650,
+        "accuracy": 0.9036,
+        "precision": 0.6928,
+        "recall": 0.9335,
+        "f1": 0.7954,
+        "confusion_matrix": [
+          [
+            1182,
+            137
+          ],
+          [
+            22,
+            309
+          ]
+        ],
+        "true_negative": 1182,
+        "false_positive": 137,
+        "false_negative": 22,
+        "true_positive": 309,
+        "false_positive_rate": 0.1039,
+        "false_negative_rate": 0.0665,
+        "auc_roc": 0.9806,
+        "auc_pr": 0.94
+      },
+      "post_drift": {
+        "n": 1350,
+        "accuracy": 0.7319,
+        "precision": 0.4451,
+        "recall": 0.9897,
+        "f1": 0.6141,
+        "confusion_matrix": [
+          [
+            700,
+            359
+          ],
+          [
+            3,
+            288
+          ]
+        ],
+        "true_negative": 700,
+        "false_positive": 359,
+        "false_negative": 3,
+        "true_positive": 288,
+        "false_positive_rate": 0.339,
+        "false_negative_rate": 0.0103,
+        "auc_roc": 0.9459,
+        "auc_pr": 0.8095
+      }
+    }
+  },
+  "auc_roc": 0.9619,
+  "auc_pr": 0.8853,
+  "agent": {
+    "accuracy": 0.6013,
+    "precision": 0.3421,
+    "recall": 1.0,
+    "f1": 0.5098,
+    "confusion_matrix": [
+      [
+        1182,
+        1196
+      ],
+      [
+        0,
+        622
+      ]
+    ],
+    "true_negative": 1182,
+    "false_positive": 1196,
+    "false_negative": 0,
+    "true_positive": 622,
+    "false_positive_rate": 0.5029,
+    "false_negative_rate": 0.0,
+    "auc_roc": null,
+    "auc_pr": null,
+    "share_blocked": 0.2447,
+    "share_hidden": 0.3613,
+    "share_published": 0.394,
+    "false_block_rate": 0.0753,
+    "false_blocks": 179,
+    "benign_sent_to_review_rate": 0.4277,
+    "benign_sent_to_review": 1017,
+    "harmful_published_rate": 0.0,
+    "harmful_blocked_rate": 0.8923,
+    "harmful_hidden_rate": 0.1077,
+    "harmful_published": 0,
+    "human_review_workload": 1084,
+    "human_review_workload_rate": 0.3613,
+    "manual_review_seconds_if_all": 135000.0,
+    "agent_review_seconds": 48780.0,
+    "latency_ms_mean": 3.265,
+    "latency_ms_median": 3.088,
+    "latency_ms_p95": 3.8,
+    "latency_ms_max": 129.709,
+    "latency_ms_std": 3.275
+  },
+  "simulator": {
+    "api_errors": 35,
+    "api_failures_injected": 35,
+    "safe_failures_handled": 35,
+    "safe_failure_handling_rate": 1.0,
+    "coordination_false_positives": 0,
+    "coordination_false_positive_rate": 0.0,
+    "by_phase": {
+      "pre_drift": {
+        "n": 1650,
+        "accuracy": 0.7448,
+        "precision": 0.4402,
+        "recall": 1.0,
+        "f1": 0.6113,
+        "confusion_matrix": [
+          [
+            898,
+            421
+          ],
+          [
+            0,
+            331
+          ]
+        ],
+        "true_negative": 898,
+        "false_positive": 421,
+        "false_negative": 0,
+        "true_positive": 331,
+        "false_positive_rate": 0.3192,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "post_drift": {
+        "n": 1350,
+        "accuracy": 0.4259,
+        "precision": 0.273,
+        "recall": 1.0,
+        "f1": 0.4289,
+        "confusion_matrix": [
+          [
+            284,
+            775
+          ],
+          [
+            0,
+            291
+          ]
+        ],
+        "true_negative": 284,
+        "false_positive": 775,
+        "false_negative": 0,
+        "true_positive": 291,
+        "false_positive_rate": 0.7318,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      }
+    },
+    "attacks": {
+      "n_attack_comments": 339,
+      "contained": 339,
+      "filtered": 339,
+      "leaked": 0,
+      "contained_rate": 1.0,
+      "published_before_first_containment": 0,
+      "by_campaign": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "per_campaign": {
+        "0": {
+          "n": 163,
+          "contained": 163,
+          "contained_rate": 1.0,
+          "published_before_first_containment": 0
+        },
+        "1": {
+          "n": 176,
+          "contained": 176,
+          "contained_rate": 1.0,
+          "published_before_first_containment": 0
+        }
+      },
+      "by_phase": {
+        "pre_drift": {
+          "n": 163,
+          "contained": 163,
+          "contained_rate": 1.0
+        },
+        "post_drift": {
+          "n": 176,
+          "contained": 176,
+          "contained_rate": 1.0
+        }
+      }
+    }
+  },
+  "by_model_version": {
+    "1": {
+      "n": 1124,
+      "classifier": {
+        "accuracy": 0.9324,
+        "precision": 0.7993,
+        "recall": 0.9419,
+        "f1": 0.8648,
+        "confusion_matrix": [
+          [
+            805,
+            61
+          ],
+          [
+            15,
+            243
+          ]
+        ],
+        "true_negative": 805,
+        "false_positive": 61,
+        "false_negative": 15,
+        "true_positive": 243,
+        "false_positive_rate": 0.0704,
+        "false_negative_rate": 0.0581,
+        "auc_roc": 0.991,
+        "auc_pr": 0.9736
+      },
+      "agent": {
+        "accuracy": 0.8372,
+        "precision": 0.585,
+        "recall": 1.0,
+        "f1": 0.7382,
+        "confusion_matrix": [
+          [
+            683,
+            183
+          ],
+          [
+            0,
+            258
+          ]
+        ],
+        "true_negative": 683,
+        "false_positive": 183,
+        "false_negative": 0,
+        "true_positive": 258,
+        "false_positive_rate": 0.2113,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "pre_drift": {
+          "n": 1124,
+          "accuracy": 0.9324,
+          "precision": 0.7993,
+          "recall": 0.9419,
+          "f1": 0.8648,
+          "confusion_matrix": [
+            [
+              805,
+              61
+            ],
+            [
+              15,
+              243
+            ]
+          ],
+          "true_negative": 805,
+          "false_positive": 61,
+          "false_negative": 15,
+          "true_positive": 243,
+          "false_positive_rate": 0.0704,
+          "false_negative_rate": 0.0581,
+          "auc_roc": 0.991,
+          "auc_pr": 0.9736
+        }
+      },
+      "agent_by_phase": {
+        "pre_drift": {
+          "n": 1124,
+          "accuracy": 0.8372,
+          "precision": 0.585,
+          "recall": 1.0,
+          "f1": 0.7382,
+          "confusion_matrix": [
+            [
+              683,
+              183
+            ],
+            [
+              0,
+              258
+            ]
+          ],
+          "true_negative": 683,
+          "false_positive": 183,
+          "false_negative": 0,
+          "true_positive": 258,
+          "false_positive_rate": 0.2113,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    },
+    "2": {
+      "n": 542,
+      "classifier": {
+        "accuracy": 0.8413,
+        "precision": 0.4589,
+        "recall": 0.9054,
+        "f1": 0.6091,
+        "confusion_matrix": [
+          [
+            389,
+            79
+          ],
+          [
+            7,
+            67
+          ]
+        ],
+        "true_negative": 389,
+        "false_positive": 79,
+        "false_negative": 7,
+        "true_positive": 67,
+        "false_positive_rate": 0.1688,
+        "false_negative_rate": 0.0946,
+        "auc_roc": 0.9592,
+        "auc_pr": 0.8506
+      },
+      "agent": {
+        "accuracy": 0.5443,
+        "precision": 0.2305,
+        "recall": 1.0,
+        "f1": 0.3747,
+        "confusion_matrix": [
+          [
+            221,
+            247
+          ],
+          [
+            0,
+            74
+          ]
+        ],
+        "true_negative": 221,
+        "false_positive": 247,
+        "false_negative": 0,
+        "true_positive": 74,
+        "false_positive_rate": 0.5278,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "pre_drift": {
+          "n": 526,
+          "accuracy": 0.8422,
+          "precision": 0.4648,
+          "recall": 0.9041,
+          "f1": 0.614,
+          "confusion_matrix": [
+            [
+              377,
+              76
+            ],
+            [
+              7,
+              66
+            ]
+          ],
+          "true_negative": 377,
+          "false_positive": 76,
+          "false_negative": 7,
+          "true_positive": 66,
+          "false_positive_rate": 0.1678,
+          "false_negative_rate": 0.0959,
+          "auc_roc": 0.9611,
+          "auc_pr": 0.8594
+        },
+        "post_drift": {
+          "n": 16,
+          "accuracy": 0.8125,
+          "precision": 0.25,
+          "recall": 1.0,
+          "f1": 0.4,
+          "confusion_matrix": [
+            [
+              12,
+              3
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "true_negative": 12,
+          "false_positive": 3,
+          "false_negative": 0,
+          "true_positive": 1,
+          "false_positive_rate": 0.2,
+          "false_negative_rate": 0.0,
+          "auc_roc": 0.8667,
+          "auc_pr": 0.3333
+        }
+      },
+      "agent_by_phase": {
+        "pre_drift": {
+          "n": 526,
+          "accuracy": 0.5475,
+          "precision": 0.2347,
+          "recall": 1.0,
+          "f1": 0.3802,
+          "confusion_matrix": [
+            [
+              215,
+              238
+            ],
+            [
+              0,
+              73
+            ]
+          ],
+          "true_negative": 215,
+          "false_positive": 238,
+          "false_negative": 0,
+          "true_positive": 73,
+          "false_positive_rate": 0.5254,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        },
+        "post_drift": {
+          "n": 16,
+          "accuracy": 0.4375,
+          "precision": 0.1,
+          "recall": 1.0,
+          "f1": 0.1818,
+          "confusion_matrix": [
+            [
+              6,
+              9
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "true_negative": 6,
+          "false_positive": 9,
+          "false_negative": 0,
+          "true_positive": 1,
+          "false_positive_rate": 0.6,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    },
+    "3": {
+      "n": 348,
+      "classifier": {
+        "accuracy": 0.7184,
+        "precision": 0.2276,
+        "recall": 0.9032,
+        "f1": 0.3636,
+        "confusion_matrix": [
+          [
+            222,
+            95
+          ],
+          [
+            3,
+            28
+          ]
+        ],
+        "true_negative": 222,
+        "false_positive": 95,
+        "false_negative": 3,
+        "true_positive": 28,
+        "false_positive_rate": 0.2997,
+        "false_negative_rate": 0.0968,
+        "auc_roc": 0.8596,
+        "auc_pr": 0.4856
+      },
+      "agent": {
+        "accuracy": 0.3736,
+        "precision": 0.1245,
+        "recall": 1.0,
+        "f1": 0.2214,
+        "confusion_matrix": [
+          [
+            99,
+            218
+          ],
+          [
+            0,
+            31
+          ]
+        ],
+        "true_negative": 99,
+        "false_positive": 218,
+        "false_negative": 0,
+        "true_positive": 31,
+        "false_positive_rate": 0.6877,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "post_drift": {
+          "n": 348,
+          "accuracy": 0.7184,
+          "precision": 0.2276,
+          "recall": 0.9032,
+          "f1": 0.3636,
+          "confusion_matrix": [
+            [
+              222,
+              95
+            ],
+            [
+              3,
+              28
+            ]
+          ],
+          "true_negative": 222,
+          "false_positive": 95,
+          "false_negative": 3,
+          "true_positive": 28,
+          "false_positive_rate": 0.2997,
+          "false_negative_rate": 0.0968,
+          "auc_roc": 0.8596,
+          "auc_pr": 0.4856
+        }
+      },
+      "agent_by_phase": {
+        "post_drift": {
+          "n": 348,
+          "accuracy": 0.3736,
+          "precision": 0.1245,
+          "recall": 1.0,
+          "f1": 0.2214,
+          "confusion_matrix": [
+            [
+              99,
+              218
+            ],
+            [
+              0,
+              31
+            ]
+          ],
+          "true_negative": 99,
+          "false_positive": 218,
+          "false_negative": 0,
+          "true_positive": 31,
+          "false_positive_rate": 0.6877,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    },
+    "4": {
+      "n": 507,
+      "classifier": {
+        "accuracy": 0.8422,
+        "precision": 0.7241,
+        "recall": 1.0,
+        "f1": 0.84,
+        "confusion_matrix": [
+          [
+            217,
+            80
+          ],
+          [
+            0,
+            210
+          ]
+        ],
+        "true_negative": 217,
+        "false_positive": 80,
+        "false_negative": 0,
+        "true_positive": 210,
+        "false_positive_rate": 0.2694,
+        "false_negative_rate": 0.0,
+        "auc_roc": 0.9508,
+        "auc_pr": 0.9054
+      },
+      "agent": {
+        "accuracy": 0.5819,
+        "precision": 0.4976,
+        "recall": 1.0,
+        "f1": 0.6646,
+        "confusion_matrix": [
+          [
+            85,
+            212
+          ],
+          [
+            0,
+            210
+          ]
+        ],
+        "true_negative": 85,
+        "false_positive": 212,
+        "false_negative": 0,
+        "true_positive": 210,
+        "false_positive_rate": 0.7138,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "post_drift": {
+          "n": 507,
+          "accuracy": 0.8422,
+          "precision": 0.7241,
+          "recall": 1.0,
+          "f1": 0.84,
+          "confusion_matrix": [
+            [
+              217,
+              80
+            ],
+            [
+              0,
+              210
+            ]
+          ],
+          "true_negative": 217,
+          "false_positive": 80,
+          "false_negative": 0,
+          "true_positive": 210,
+          "false_positive_rate": 0.2694,
+          "false_negative_rate": 0.0,
+          "auc_roc": 0.9508,
+          "auc_pr": 0.9054
+        }
+      },
+      "agent_by_phase": {
+        "post_drift": {
+          "n": 507,
+          "accuracy": 0.5819,
+          "precision": 0.4976,
+          "recall": 1.0,
+          "f1": 0.6646,
+          "confusion_matrix": [
+            [
+              85,
+              212
+            ],
+            [
+              0,
+              210
+            ]
+          ],
+          "true_negative": 85,
+          "false_positive": 212,
+          "false_negative": 0,
+          "true_positive": 210,
+          "false_positive_rate": 0.7138,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    },
+    "5": {
+      "n": 291,
+      "classifier": {
+        "accuracy": 0.6048,
+        "precision": 0.1786,
+        "recall": 1.0,
+        "f1": 0.303,
+        "confusion_matrix": [
+          [
+            151,
+            115
+          ],
+          [
+            0,
+            25
+          ]
+        ],
+        "true_negative": 151,
+        "false_positive": 115,
+        "false_negative": 0,
+        "true_positive": 25,
+        "false_positive_rate": 0.4323,
+        "false_negative_rate": 0.0,
+        "auc_roc": 0.9986,
+        "auc_pr": 0.9894
+      },
+      "agent": {
+        "accuracy": 0.2612,
+        "precision": 0.1042,
+        "recall": 1.0,
+        "f1": 0.1887,
+        "confusion_matrix": [
+          [
+            51,
+            215
+          ],
+          [
+            0,
+            25
+          ]
+        ],
+        "true_negative": 51,
+        "false_positive": 215,
+        "false_negative": 0,
+        "true_positive": 25,
+        "false_positive_rate": 0.8083,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "post_drift": {
+          "n": 291,
+          "accuracy": 0.6048,
+          "precision": 0.1786,
+          "recall": 1.0,
+          "f1": 0.303,
+          "confusion_matrix": [
+            [
+              151,
+              115
+            ],
+            [
+              0,
+              25
+            ]
+          ],
+          "true_negative": 151,
+          "false_positive": 115,
+          "false_negative": 0,
+          "true_positive": 25,
+          "false_positive_rate": 0.4323,
+          "false_negative_rate": 0.0,
+          "auc_roc": 0.9986,
+          "auc_pr": 0.9894
+        }
+      },
+      "agent_by_phase": {
+        "post_drift": {
+          "n": 291,
+          "accuracy": 0.2612,
+          "precision": 0.1042,
+          "recall": 1.0,
+          "f1": 0.1887,
+          "confusion_matrix": [
+            [
+              51,
+              215
+            ],
+            [
+              0,
+              25
+            ]
+          ],
+          "true_negative": 51,
+          "false_positive": 215,
+          "false_negative": 0,
+          "true_positive": 25,
+          "false_positive_rate": 0.8083,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    },
+    "6": {
+      "n": 188,
+      "classifier": {
+        "accuracy": 0.6489,
+        "precision": 0.2667,
+        "recall": 1.0,
+        "f1": 0.4211,
+        "confusion_matrix": [
+          [
+            98,
+            66
+          ],
+          [
+            0,
+            24
+          ]
+        ],
+        "true_negative": 98,
+        "false_positive": 66,
+        "false_negative": 0,
+        "true_positive": 24,
+        "false_positive_rate": 0.4024,
+        "false_negative_rate": 0.0,
+        "auc_roc": 1.0,
+        "auc_pr": 1.0
+      },
+      "agent": {
+        "accuracy": 0.3564,
+        "precision": 0.1655,
+        "recall": 1.0,
+        "f1": 0.284,
+        "confusion_matrix": [
+          [
+            43,
+            121
+          ],
+          [
+            0,
+            24
+          ]
+        ],
+        "true_negative": 43,
+        "false_positive": 121,
+        "false_negative": 0,
+        "true_positive": 24,
+        "false_positive_rate": 0.7378,
+        "false_negative_rate": 0.0,
+        "auc_roc": null,
+        "auc_pr": null
+      },
+      "classifier_by_phase": {
+        "post_drift": {
+          "n": 188,
+          "accuracy": 0.6489,
+          "precision": 0.2667,
+          "recall": 1.0,
+          "f1": 0.4211,
+          "confusion_matrix": [
+            [
+              98,
+              66
+            ],
+            [
+              0,
+              24
+            ]
+          ],
+          "true_negative": 98,
+          "false_positive": 66,
+          "false_negative": 0,
+          "true_positive": 24,
+          "false_positive_rate": 0.4024,
+          "false_negative_rate": 0.0,
+          "auc_roc": 1.0,
+          "auc_pr": 1.0
+        }
+      },
+      "agent_by_phase": {
+        "post_drift": {
+          "n": 188,
+          "accuracy": 0.3564,
+          "precision": 0.1655,
+          "recall": 1.0,
+          "f1": 0.284,
+          "confusion_matrix": [
+            [
+              43,
+              121
+            ],
+            [
+              0,
+              24
+            ]
+          ],
+          "true_negative": 43,
+          "false_positive": 121,
+          "false_negative": 0,
+          "true_positive": 24,
+          "false_positive_rate": 0.7378,
+          "false_negative_rate": 0.0,
+          "auc_roc": null,
+          "auc_pr": null
+        }
+      }
+    }
+  },
+  "by_phase": {
+    "pre_drift": {
+      "n": 1650,
+      "accuracy": 0.7448,
+      "precision": 0.4402,
+      "recall": 1.0,
+      "f1": 0.6113,
+      "confusion_matrix": [
+        [
+          898,
+          421
+        ],
+        [
+          0,
+          331
+        ]
+      ],
+      "true_negative": 898,
+      "false_positive": 421,
+      "false_negative": 0,
+      "true_positive": 331,
+      "false_positive_rate": 0.3192,
+      "false_negative_rate": 0.0,
+      "auc_roc": null,
+      "auc_pr": null
+    },
+    "post_drift": {
+      "n": 1350,
+      "accuracy": 0.4259,
+      "precision": 0.273,
+      "recall": 1.0,
+      "f1": 0.4289,
+      "confusion_matrix": [
+        [
+          284,
+          775
+        ],
+        [
+          0,
+          291
+        ]
+      ],
+      "true_negative": 284,
+      "false_positive": 775,
+      "false_negative": 0,
+      "true_positive": 291,
+      "false_positive_rate": 0.7318,
+      "false_negative_rate": 0.0,
+      "auc_roc": null,
+      "auc_pr": null
+    }
+  },
+  "attacks": {
+    "n_attack_comments": 339,
+    "contained": 339,
+    "filtered": 339,
+    "leaked": 0,
+    "contained_rate": 1.0,
+    "published_before_first_containment": 0,
+    "by_campaign": {
+      "mean": 1.0,
+      "std": 0.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "per_campaign": {
+      "0": {
+        "n": 163,
+        "contained": 163,
+        "contained_rate": 1.0,
+        "published_before_first_containment": 0
+      },
+      "1": {
+        "n": 176,
+        "contained": 176,
+        "contained_rate": 1.0,
+        "published_before_first_containment": 0
+      }
+    },
+    "by_phase": {
+      "pre_drift": {
+        "n": 163,
+        "contained": 163,
+        "contained_rate": 1.0
+      },
+      "post_drift": {
+        "n": 176,
+        "contained": 176,
+        "contained_rate": 1.0
+      }
+    }
+  },
+  "api_errors": 35,
+  "safe_failure_handling_rate": 1.0,
+  "coordination_false_positives": 0,
+  "coordination_false_positive_rate": 0.0,
+  "accuracy": 0.6013,
+  "precision": 0.3421,
+  "recall": 1.0,
+  "f1": 0.5098,
+  "false_positive_rate": 0.5029,
+  "false_negative_rate": 0.0,
+  "false_block_rate": 0.0753,
+  "benign_sent_to_review_rate": 0.4277,
+  "harmful_published_rate": 0.0,
+  "harmful_blocked_rate": 0.8923,
+  "harmful_hidden_rate": 0.1077,
+  "human_review_workload": 1084,
+  "share_blocked": 0.2447,
+  "share_hidden": 0.3613,
+  "share_published": 0.394,
+  "latency_ms_mean": 3.265,
+  "latency_ms_median": 3.088,
+  "latency_ms_p95": 3.8,
+  "latency_ms_max": 129.709,
+  "latency_ms_std": 3.275,
+  "seed": 7,
+  "n_steps": 3000,
+  "run_id": "20261019T024406Z",
+  "learning_enabled": true,
+  "coordination_enabled": true,
+  "utility_config": {
+    "block_harmful": 1.0,
+    "block_benign": -1.0,
+    "hide_harmful": 0.6,
+    "hide_benign": -0.15,
+    "publish_harmful": -10.0,
+    "publish_benign": 0.1,
+    "surge_publish_multiplier": 1.5,
+    "severity_gain": 0.5,
+    "coordination_weight": 0.6,
+    "coordination_gate": 0.15,
+    "surge_threshold": 0.5,
+    "threat_block_threshold": 0.9,
+    "severe_toxicity_block_threshold": 0.95,
+    "identity_hate_hide_threshold": 0.9,
+    "coordinated_attack_block_threshold": 0.85
+  },
+  "utility_action_regions": {
+    "publish": [
+      0.0,
+      0.0231
+    ],
+    "hide_for_review": [
+      0.0231,
+      0.6801
+    ],
+    "block": [
+      0.6801,
+      1.0
+    ]
+  },
+  "n_feedback_received": 1185,
+  "n_retrains": 6,
+  "model_version_final": 7,
+  "api_calls": 3035,
+  "api_failures": 35,
+  "n_api_errors": 35,
+  "log_path": "C:\\dev\\safefeed-agent\\logs\\run_20261019T024406Z.jsonl",
+  "environment": "simulado",
+  "failure_handling": {
+    "failures_injected": 11,
+    "failures_handled_correctly": 11,
+    "safe_failure_handling_rate": 1.0,
+    "cases": [
+      {
+        "failure": "comment_absent",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "comment_missing"
+      },
+      {
+        "failure": "text_empty",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "text_empty"
+      },
+      {
+        "failure": "text_whitespace",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "text_whitespace"
+      },
+      {
+        "failure": "text_absent",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "text_missing"
+      },
+      {
+        "failure": "user_absent",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "user_missing"
+      },
+      {
+        "failure": "thread_absent",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "thread_missing"
+      },
+      {
+        "failure": "timestamp_invalid",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "timestamp_invalid"
+      },
+      {
+        "failure": "api_unavailable",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": false,
+        "attempts": 2,
+        "error": "api_unavailable:ConnectionError;api_unavailable:ConnectionError"
+      },
+      {
+        "failure": "api_response_invalid",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": false,
+        "attempts": 2,
+        "error": "invalid_api_response;invalid_api_response"
+      },
+      {
+        "failure": "coordination_signal_missing",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "coordination_sensor_missing_data"
+      },
+      {
+        "failure": "comment_malformed",
+        "handled_safely": true,
+        "action": "hide_for_review",
+        "api_ok": true,
+        "attempts": 1,
+        "error": "malformed_comment_text"
+      }
+    ]
+  }
+}

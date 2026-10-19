@@ -8,5 +8,6 @@ venv/
 models/*.joblib
 logs/*.jsonl
 reports/*.json
-
-
+!reports/offline_metrics.json
+!reports/last_run_summary.json
+!reports/policy_calibration.json
