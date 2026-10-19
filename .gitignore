@@ -5,10 +5,10 @@ __pycache__/
 venv/
 
 # Se regeneran con los comandos del README
-models/*.joblib
-logs/*.jsonl
-reports/*.json
-!reports/offline_metrics.json
-!reports/last_run_summary.json
-!reports/policy_calibration.json
-!reports/scenario_results.json
+#models/*.joblib
+#logs/*.jsonl
+#reports/*.json
+#!reports/offline_metrics.json
+#!reports/last_run_summary.json
+#!reports/policy_calibration.json
+#!reports/scenario_results.json
