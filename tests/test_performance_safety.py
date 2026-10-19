@@ -9,7 +9,15 @@ from safefeed.config import CLASSIFIER_THRESHOLDS, LABELS, AgentConfig, UtilityC
 from safefeed.logger import RunLogger
 from safefeed.metrics import calibrate_utility_policy, compute_run_metrics
 from safefeed.runner import evaluate_failure_handling
-from safefeed.scenarios import SCENARIO_DEFINITIONS, _acceptance, _stats
+from safefeed.scenarios import (
+    CHALLENGE_CASES,
+    SCENARIO_DEFINITIONS,
+    _acceptance,
+    _challenge_acceptance,
+    _challenge_group_metrics,
+    _stats,
+    _wilson_interval,
+)
 from safefeed.schemas import Action, ModeratorFeedback, Percept, RawComment
 from safefeed.simulator import ApiResponse
 from safefeed.train import calibrate_threshold
@@ -282,4 +290,60 @@ def test_formal_scenario_catalog_and_acceptance_statistics():
     }
     result = _acceptance([0.90, 0.91, 0.89, 0.93, 0.90], 0.90, "min", "recall")
     assert result["mean_pass"] and not result["all_repetitions_pass"]
+    assert not result["pass"]
+    assert all(
+        {"suite", "difficulty", "provenance"} <= scenario.keys()
+        for scenario in SCENARIO_DEFINITIONS.values()
+    )
+
+
+def test_challenge_set_has_unique_balanced_examples_and_no_expected_actions():
+    ids = [case["id"] for case in CHALLENGE_CASES]
+    texts = [case["text"] for case in CHALLENGE_CASES]
+    assert len(ids) == len(set(ids)) == 60
+    assert len(texts) == len(set(texts)) == 60
+    assert sum(not case["is_toxic"] for case in CHALLENGE_CASES) == 30
+    assert sum(case["is_toxic"] for case in CHALLENGE_CASES) == 30
+    assert {case["difficulty"] for case in CHALLENGE_CASES} == {
+        "boundary", "adversarial",
+    }
+    assert all("expected_action" not in case for case in CHALLENGE_CASES)
+
+
+def test_challenge_metrics_separate_false_blocks_review_and_publication():
+    records = [
+        {"is_toxic": False, "p_toxic": 0.1, "classifier_threshold": 0.35,
+         "action": "publish"},
+        {"is_toxic": False, "p_toxic": 0.4, "classifier_threshold": 0.35,
+         "action": "hide_for_review"},
+        {"is_toxic": False, "p_toxic": 0.9, "classifier_threshold": 0.35,
+         "action": "block"},
+        {"is_toxic": True, "p_toxic": 0.8, "classifier_threshold": 0.35,
+         "action": "hide_for_review"},
+        {"is_toxic": True, "p_toxic": 0.2, "classifier_threshold": 0.35,
+         "action": "publish"},
+        {"is_toxic": True, "p_toxic": 0.9, "classifier_threshold": 0.35,
+         "action": "block"},
+    ]
+    metrics = _challenge_group_metrics(records)
+    assert metrics["n_unique_comments"] == 6
+    assert metrics["false_block_rate"]["value"] == pytest.approx(1 / 3)
+    assert metrics["benign_sent_to_review_rate"]["value"] == pytest.approx(1 / 3)
+    assert metrics["harmful_published_rate"]["value"] == pytest.approx(1 / 3)
+    assert metrics["human_review_workload"]["value"] == pytest.approx(1 / 3)
+    assert metrics["automatic_publication_rate"]["value"] == pytest.approx(1 / 3)
+    assert metrics["false_block_rate"]["wilson_95_percent_ci"] == _wilson_interval(1, 3)
+    assert metrics["agent_decision"]["confusion_matrix"] == [[1, 2], [1, 2]]
+
+
+def test_challenge_acceptance_requires_conservative_confidence_bound():
+    rate = {
+        "value": 0.1,
+        "numerator": 3,
+        "denominator": 30,
+        "wilson_95_percent_ci": _wilson_interval(3, 30),
+    }
+    result = _challenge_acceptance(rate, 0.10, "max")
+    assert result["point_estimate_pass"]
+    assert not result["confidence_bound_pass"]
     assert not result["pass"]

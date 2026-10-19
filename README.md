@@ -331,20 +331,37 @@ eventos `percept`, `decision`, `action`, `ground_truth` y `scenario_result`.
 | C11 | Oleada de 25 comentarios coordinados | Contener ≥90 % | Contención de ataques |
 
 C1–C10 se repiten cinco veces cada uno; C8 y C9 incluyen dos y tres subcasos por repetición,
-respectivamente. C11 ejecuta cinco oleadas, una por semilla. Para las cinco mediciones de F1 se
-utiliza el modelo y umbral ya fijados y cinco particiones estratificadas muestreadas del holdout test
-reservado del split seed 42. No se recalibran pesos ni umbrales con estas particiones. Como las
-particiones proceden del mismo holdout, se solapan entre semillas y no son observaciones estadísticas
-independientes; se reportan como repetibilidad, no como cinco nuevos conjuntos Jigsaw independientes.
+respectivamente. C11 ejecuta cinco oleadas, una por semilla. Esta sección es una **suite funcional y
+de seguridad**: sus repeticiones demuestran que se recorren las rutas previstas, pero no son textos
+nuevos ni observaciones independientes y no se usan para afirmar generalización o tasas reales de
+falsos positivos.
 
-Los criterios se fijan antes de la batería: F1 ≥0,75; dañinos publicados ≤10 %; falsos bloqueos
-≤5 %; contención de ataques ≥90 %; latencia p95 ≤100 ms; manejo seguro de fallas ≥95 %. Para cada
-métrica el reporte incluye los cinco resultados, media, desviación estándar poblacional, mínimo y
-máximo. Para F1, el umbral se evalúa sobre la media de las cinco particiones de test, mientras cada
-partición se muestra y se señala cualquier valor individual bajo 0,75. Para dañinos publicados,
-falsos bloqueos, contención, latencia y fallas deben pasar tanto la media como cada repetición. La
-batería mide más de 50 acciones en total combinando C1–C11 a través de las cinco semillas, y no
-compara latencia con moderadores humanos.
+La **suite de desempeño** se informa por separado:
+
+1. El clasificador se evalúa una sola vez sobre las **23.936 filas del test Jigsaw reservado completo**
+   del split estratificado seed 42 de `train.py`. No se seleccionan manualmente textos, no se
+   recalibra el umbral 0,35 y no se elige el modelo usando test. Se calcula un IC bootstrap
+   estratificado de F1 (500 remuestras con predicciones y umbral fijos); se declara que alcanza
+   el objetivo únicamente si el límite inferior del IC del 95 % también es ≥0,75.
+2. Se ejecuta un desafío curado de 60 textos **únicos**: 30 benignos difíciles y 30 dañinos difíciles.
+   Los textos se fijan en `safefeed/scenarios.py` antes de evaluarlos, una vez cada uno. Se reportan
+   por dificultad y categoría; no se filtran según la probabilidad observada ni se usan para calibrar.
+   Las etiquetas son de referencia, redactadas manualmente para casos sintéticos, no anotaciones de
+   moderadores ni etiquetas Jigsaw.
+
+El desafío etiqueta cada comentario con `difficulty`, `provenance` y `category`. Incluye citas de
+insultos, negación, desacuerdo, menciones académicas, crítica política/sarcástica y temas sensibles
+benignos; además amenazas veladas, errores ortográficos, leetspeak, palabras separadas, sustitución
+Unicode/emojis, lenguaje codificado, ataques contextuales y ejemplos multilingües. Ningún caso
+desafío incluye una acción esperada que fuerce la decisión del agente. Las acciones se miden después
+de ejecutar la política normal. Cada resultado enlaza con los eventos del log por `comment_id` y hash.
+
+Las tasas del conjunto desafío incluyen numerador, denominador e intervalo Wilson al 95 %. El intervalo
+es descriptivo: al ser un conjunto curado pequeño, no representa una muestra aleatoria de tráfico real.
+Para comparar el umbral de dañinos publicados y falsos bloqueos, se reportan tanto la estimación
+puntual como el límite de confianza conservador; `pass` exige que ese límite alcance el objetivo.
+La carga de revisión y la publicación automática se muestran por separado, sin un umbral añadido
+retroactivamente.
 
 El límite de comentario de 20.000 caracteres es una restricción explícita de seguridad/rendimiento
 en `AgentConfig.max_comment_chars`. Las entradas más largas (C7) se envían a revisión y se registran;
@@ -354,47 +371,62 @@ El escenario C7 somete deliberadamente una entrada mucho mayor que la habitual; 
 latencia, se reportan sin excluirlos. C8–C10 contabilizan cada falla individual, incluidos los
 subcasos, sin retirar fallas que hayan terminado en revisión.
 
-#### Resultados medidos en cinco repeticiones
+#### Resultados medidos
 
-Resultados de `reports/scenario_results.json` (modelo/umbral fijos; semillas 1–5):
+Resultados del test Jigsaw completo y del conjunto desafío del reporte generado el 2026-10-19
+(modelo y umbral originales fijos):
 
-| Criterio | Resultados por semilla | Media | DE | Mín. | Máx. | Evaluación |
-|---|---|---:|---:|---:|---:|---|
-| F1 Jigsaw (particiones test) | 0,7765; 0,7418; 0,7670; 0,7860; 0,7945 | 0,7732 | 0,0182 | 0,7418 | 0,7945 | **Cumple por media**; una partición queda bajo 0,75 |
-| Dañinos publicados C2–C5/C11 | 0; 0; 0; 0; 0 % | 0 % | 0 % | 0 % | 0 % | **Cumple media y cada repetición** |
-| Falsos bloqueos C1/C6 | 0; 0; 0; 0; 0 % | 0 % | 0 % | 0 % | 0 % | **Cumple media y cada repetición** |
-| Contención C11 | 100; 100; 100; 100; 100 % | 100 % | 0 % | 100 % | 100 % | **Cumple media y cada repetición** |
-| p95 latencia por semilla (ms) | 4,532; 4,936; 4,480; 5,199; 4,769 | 4,783 | 0,265 | 4,480 | 5,199 | **Cumple media y cada repetición** |
-| Manejo seguro C8–C10 | 100; 100; 100; 100; 100 % | 100 % | 0 % | 100 % | 100 % | **Cumple media y cada repetición** |
+| Medida | n | Resultado | Incertidumbre / interpretación |
+|---|---:|---:|---|
+| Jigsaw test: F1 / precisión / recall | 23.936 | 0,7759 / 0,6906 / 0,8854 | IC bootstrap 95 % F1: [0,7647; 0,7854]; cumple F1 ≥0,75 |
+| Jigsaw test: accuracy / AUC-ROC / AUC-PR | 23.936 | 0,9510 / 0,9806 / 0,8977 | Test completo, prevalencia tóxica 9,58 % |
+| Jigsaw test: matriz `[[TN, FP], [FN, TP]]` | 23.936 | `[[20732, 910], [263, 2031]]` | FPR 4,20 %; FNR 11,46 % |
+| Desafío: F1 clasificador / F1 acción final | 60 | 0,6182 / 0,7105 | 30 benignos y 30 dañinos únicos; conjunto curado, no test Jigsaw |
+| Dañinos publicados en desafío | 30 dañinos | 3/30 = 10,0 % | IC Wilson 95 % [3,46 %; 25,62 %]; el límite superior no demuestra ≤10 % |
+| Falsos bloqueos benignos en desafío | 30 benignos | 6/30 = 20,0 % | IC Wilson 95 % [9,51 %; 37,31 %]; no cumple ≤5 % |
+| Benignos enviados a revisión | 30 benignos | 13/30 = 43,3 % | Distinto de falsos bloqueos |
+| Carga de revisión total / publicación automática | 60 | 27/60 = 45,0 % / 14/60 = 23,3 % | Las 19 acciones restantes fueron bloqueos |
+| Casos de desafío en banda de probabilidad 0,30–0,70 | 60 | 6 | Reportados por ID; la banda no se usó para seleccionar ni calibrar |
+| Contención / manejo seguro C11 y C8–C10 | 5 repeticiones | 100 % / 100 % | Media, DE 0, mínimo y máximo se conservan por semilla |
+| Latencia C1–C11 | 190 acciones | Media 3,029 ms; mediana 3,073; p95 4,571; máximo 10,950; DE 1,679 | p95 por semilla: media 4,414 ms; DE 0,165; mín. 4,220; máx. 4,641 |
 
-La F1 se acepta con el umbral predefinido sobre la **media**, no se oculta la variación: la semilla 2
-dio 0,7418. Las cinco particiones se muestrean del mismo holdout reservado y se solapan; son una
-prueba de sensibilidad a la partición, no cinco conjuntos independientes. Para las métricas de
-seguridad y operación se requiere que tanto media como todas las semillas pasen.
+El desglose por dificultad deja visible el compromiso: en los 30 casos de frontera benignos el agente
+bloqueó 6 (20,0 %), revisó 13 (43,3 %) y publicó 11 (36,7 %); en los 30 adversariales dañinos publicó
+3 (10,0 %), revisó 14 (46,7 %) y bloqueó 13 (43,3 %). El F1 por subgrupo de dificultad no se debe
+interpretar cuando el grupo tiene una sola clase; el JSON conserva el tamaño/clase y las métricas por
+categoría. El clasificador es fuerte en el test Jigsaw general, pero el conjunto curado expone
+debilidades en contexto, evasión y falsos bloqueos que los escenarios fáciles no detectaban.
 
-En las 190 acciones de escenarios, la latencia total tuvo media 2,979 ms, mediana 2,758 ms, p95
-4,943 ms, máximo 11,001 ms y DE 1,739 ms. C7, de 65.000 caracteres, fue a revisión por el límite
-de entrada; su latencia media fue 10,393 ms (DE 0,450; mín. 9,615; máx. 11,001). C8 gestionó
-espacios/vacío, C9 sus tres metadatos inválidos y C10 cuatro intentos API fallidos por repetición;
-los tres escenarios acabaron en revisión y registraron la falla. C6 se envió a revisión en las cinco
-repeticiones: no cuenta como falso bloqueo, pero sí es una carga de revisión del 100 % para ese caso.
+El resultado por subcategoría Jigsaw usa el mismo test completo y umbral diagnóstico fijo 0,50 (el
+umbral 0,35 sigue siendo el de la etiqueta `toxic`); las etiquetas raras tienen pocos positivos:
 
-Las cinco oleadas C11 contuvieron 25/25 comentarios cada una. C1 publicó el benigno; C2 y C3
-bloquearon; C4 y C5 ocultaron para revisión; C6 y C7 ocultaron para revisión; C8–C10 usaron la
-acción segura esperada. El log JSONL contiene eventos por comentario y referencias de línea en el
-reporte. No se generó captura de video ni minuto de video; la evidencia verificable disponible es
-el JSONL y el reporte estructurado.
+| Subcategoría | Positivos en test | Precisión | Recall | F1 |
+|---|---:|---:|---:|---:|
+| severe_toxic | 229 | 0,3636 | 0,6987 | 0,4783 |
+| obscene | 1.279 | 0,7841 | 0,8577 | 0,8193 |
+| threat | 76 | 0,4184 | 0,5395 | 0,4713 |
+| insult | 1.186 | 0,6585 | 0,8179 | 0,7296 |
+| identity_hate | 215 | 0,4056 | 0,6698 | 0,5053 |
+
+En la suite funcional, los resultados de cada semilla, media, desviación estándar, mínimo y máximo
+siguen apareciendo en el JSON. Las cinco oleadas C11 prueban contención de coordinación sintética;
+no se deben mezclar con AUC-PR ni con el test Jigsaw. La latencia es del prototipo en el entorno de
+ejecución, no una comparación contra moderadores humanos. No se generó video; la evidencia disponible
+es el reporte y el JSONL enlazado por comentario.
 
 Las medidas principales son:
 
 | Medida | Umbral inicial | Campo de reporte |
 |---|---:|---|
-| F1 del clasificador | ≥ 0,75 | `final_test.f1` |
-| Comentarios dañinos publicados | ≤ 10 % | `agent.harmful_published_rate` |
-| Falsos bloqueos benignos | ≤ 5 % | `agent.false_block_rate` |
-| Contención de ataques | ≥ 90 % | `simulator.attacks.contained_rate` |
-| Latencia del prototipo | p95 ≤ 100 ms | `agent.latency_ms_p95` |
-| Manejo seguro de fallas | ≥ 95 % | `failure_handling.safe_failure_handling_rate` |
+| F1 del clasificador | ≥ 0,75 | `classifier_test.metrics.f1` y `f1_95_percent_bootstrap_ci` |
+| Dañinos publicados | ≤ 10 % | `challenge_set.overall.harmful_published_rate` |
+| Falsos bloqueos benignos | ≤ 5 % | `challenge_set.overall.false_block_rate` |
+| Benignos enviados a revisión | Diagnóstico; sin umbral fijado | `challenge_set.overall.benign_sent_to_review_rate` |
+| Carga humana de revisión | Diagnóstico | `challenge_set.overall.human_review_workload` |
+| Publicación automática | Diagnóstico | `challenge_set.overall.automatic_publication_rate` |
+| Contención de oleadas C11 | ≥ 90 % | `acceptance.attack_containment_rate` |
+| Latencia del prototipo | p95 ≤ 100 ms | `acceptance.latency_p95_ms` |
+| Manejo seguro de fallas | ≥ 95 % | `acceptance.safe_failure_handling_rate` |
 
 La latencia corresponde al entorno de ejecución del prototipo y no es una comparación contra moderadores humanos. Los resultados del simulador utilizan comentarios sintéticos y no deben presentarse como desempeño real en producción.
 
